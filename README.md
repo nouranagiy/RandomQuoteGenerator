@@ -1,6 +1,6 @@
-# CodeAlpha Random Quote Generator
+# Random Quote Generator
 
-A simple and clean Random Quote Generator application built with Flutter as part of the CodeAlpha App Development Internship.
+A simple and clean Random Quote Generator application built with Flutter.
 
 ## 📱 Project Overview
 

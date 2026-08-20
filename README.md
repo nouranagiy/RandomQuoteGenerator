@@ -61,13 +61,13 @@ Make sure you have:
 Clone the repository:
 
 ```bash
-git clone https://github.com/nouranagiy/CodeAlpha_RandomQuoteGenerator.git
+git clone https://github.com/nouranagiy/RandomQuoteGenerator.git
 ```
 
 Open the project:
 
 ```bash
-cd CodeAlpha_RandomQuoteGenerator
+cd RandomQuoteGenerator
 ```
 
 Install dependencies:
@@ -81,10 +81,6 @@ Run the application:
 ```bash
 flutter run
 ```
-
-## 🎯 Internship Task
-
-This project was developed as **Task 2: Random Quote Generator** for the CodeAlpha App Development Internship.
 
 ## 📌 Task Requirements Covered
 
@@ -104,5 +100,5 @@ Information Systems Graduate | Flutter Developer
 
 ## 📄 License
 
-This project was developed for educational and internship purposes.
+This project was developed for educational
 

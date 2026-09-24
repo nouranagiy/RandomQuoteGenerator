@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class FitnessEntry {
   final String id;
   String exerciseType;
@@ -23,6 +25,35 @@ class FitnessEntry {
       'date': date.toIso8601String(),
     };
   }
+
+  /// Serializes this entry for storage in a Firestore document at
+  /// `users/{uid}/activities/{activityId}`.
+  Map<String, dynamic> toFirestore() {
+    return {
+      'exerciseType': exerciseType,
+      'duration': duration,
+      'calories': calories,
+      'steps': steps,
+      'date': date.toIso8601String(),
+    };
+  }
+
+  /// Builds an entry from a Firestore document under
+  /// `users/{uid}/activities/{activityId}`. The document ID is the entry id.
+  factory FitnessEntry.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data() ?? <String, dynamic>{};
+    return FitnessEntry(
+      id: doc.id,
+      exerciseType: data['exerciseType'] ?? 'Workout',
+      duration: (data['duration'] as num?)?.toInt() ?? 0,
+      calories: (data['calories'] as num?)?.toInt() ?? 0,
+      steps: (data['steps'] as num?)?.toInt() ?? 0,
+      date: DateTime.tryParse(data['date'] ?? '') ?? DateTime.now(),
+    );
+  }
+
   factory FitnessEntry.fromMap(
       Map<String, dynamic> map,) {
     return FitnessEntry(

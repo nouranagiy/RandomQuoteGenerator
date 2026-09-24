@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "73123567388",
+    "project_id": "lingolearn-9cc40",
+    "storage_bucket": "lingolearn-9cc40.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:73123567388:android:a4f8c7a34223a8ebe40cd9",
+        "android_client_info": {
+          "package_name": "com.example.lingolearn"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDh5e3WdOWohfnggNBNwWsATCbBYCtGY9Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

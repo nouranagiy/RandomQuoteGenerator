@@ -124,6 +124,36 @@ This project was developed as Task 4: Language Learning App for the CodeAlpha Ap
 
 Additional features were implemented to improve the learning experience, including favorites, learned-word tracking, adjustable quiz length, quiz score history, an onboarding flow, and dark mode.
 
+## 🗣️ Pronunciation Practice (Azure Speech Assessment)
+
+The practice screen records your attempt (16 kHz mono WAV) and scores it with the
+Microsoft Azure Speech **Pronunciation Assessment** engine:
+
+* Overall, accuracy, fluency, completeness, and prosody scores
+* Word-by-word chips with per-phoneme accuracy and error tags (omission / insertion / mispronunciation) from the engine
+* "Your Attempt" vs. reference audio replay
+* Distinct localized error messages for the mic, quiet audio, too-short clips, no speech detected, timeouts, and server failures
+* A retry loop that only ever uses real engine results — never simulated scores
+
+The Azure key is **never shipped in the app**. The app requests a short-lived token (and
+the endpoint URL) from your backend:
+
+```text
+GET /token
+-> { "token": "<jwt>", "endpoint": "<speech v1 url>", "expiresInSeconds": 540 }
+```
+
+Run the sample backend (see `backend/azure_token_endpoint/`) and launch the app with:
+
+```bash
+flutter run \
+  --dart-define=LINGOLEARN_AZURE_TOKEN_URL=https://your-host/token \
+  --dart-define=LINGOLEARN_AZURE_LANGUAGE=en-US
+```
+
+If no token URL is configured the app degrades gracefully with a localized
+"practice is unavailable" message — nothing else breaks.
+
 👩‍💻 Developer
 
 Nora Nagy

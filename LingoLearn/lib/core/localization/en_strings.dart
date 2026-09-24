@@ -1,0 +1,281 @@
+const Map<String, String> enStrings = {
+  'appName': 'LingoLearn',
+  'tagline': 'Learn. Practice. Improve.',
+
+  'yourProgress': 'Your Progress',
+  'dailyLesson': 'Daily Lesson',
+  'noWordsAvailable': 'No words available',
+  'continueNewWord': 'Continue learning a new word',
+  'quickPractice': 'Quick Practice',
+  'vocabulary': 'Vocabulary',
+  'quiz': 'Quiz',
+  'favorites': 'Favorites',
+  'progress': 'Progress',
+  'testYourself': 'Test yourself',
+
+  'searchWords': 'Search words...',
+  'all': 'All',
+  'addWord': 'Add Word',
+  'editWord': 'Edit Word',
+  'deleteWord': 'Delete Word',
+  'wordDetails': 'Word Details',
+  'word': 'Word',
+  'translation': 'Translation',
+  'pronunciation': 'Pronunciation',
+  'example': 'Example',
+  'category': 'Category',
+  'saveChanges': 'Save Changes',
+  'cancel': 'Cancel',
+  'noWordsFound': 'No Words Found',
+  'tryAnotherSearch': 'Try another search or category.',
+  'markAsLearned': 'Mark as Learned',
+  'learned': 'Learned',
+  'greatJobLearned': 'Great job! You learned this word 🎉',
+  'edit': 'Edit',
+  'delete': 'Delete',
+
+  'pleaseEnterWord': 'Please enter the word',
+  'pleaseEnterTranslation': 'Please enter the translation',
+  'pleaseEnterPronunciation': 'Please enter the pronunciation',
+  'pleaseEnterExample': 'Please enter an example',
+  'pleaseEnterCategory': 'Please enter the category',
+  'hintWord': 'e.g. Amazing',
+  'hintTranslation': 'e.g. رائع',
+  'hintPronunciation': 'e.g. uh-MAY-zing',
+  'hintExample': 'e.g. This is an amazing experience.',
+  'hintCategory': 'e.g. Common Words',
+
+  'deleteWordMessage': 'This action cannot be undone.',
+
+  'practiceQuiz': 'Practice Quiz',
+  'chooseCategory': 'Choose Category',
+  'whatToPractice': 'What do you want to practice?',
+  'allCategories': 'All Categories',
+  'chooseQuizLength': 'Quiz Length',
+  'howManyQuestions': 'How many questions?',
+  'allQuestions': 'All Questions',
+  'whatIsTheMeaning': 'What is the meaning of:',
+  'chooseCorrectAnswer': 'Choose the correct answer:',
+  'nextQuestion': 'Next Question',
+  'showResult': 'Show Result',
+  'quizCompleted': 'Quiz Completed!',
+  'tryAgain': 'Try Again',
+  'done': 'Done',
+  'noWordsForQuiz': 'No Words Available',
+  'addWordsBeforeQuiz': 'Add some vocabulary words before starting the quiz.',
+  'excellent': 'Excellent! You are doing great! 🎉',
+  'greatJob': 'Great job! Keep practicing! 👏',
+  'goodEffort': 'Good effort! A little more practice will help.',
+  'keepPracticing': 'Keep practicing and you will improve! 💪',
+
+  'noFavoritesYet': 'No Favorites Yet',
+  'saveFavoriteWords': 'Save your favorite words to review them later.',
+  'browseVocabulary': 'Browse Vocabulary',
+
+  'myProgress': 'My Progress',
+  'learningProgress': 'Learning Progress',
+  'totalWords': 'Total Words',
+  'quizzes': 'Quizzes',
+  'quizPerformance': 'Quiz Performance',
+  'bestScore': 'Best Score',
+  'lastScore': 'Last Score',
+  'categories': 'Categories',
+  'takeFirstQuiz': 'Take your first quiz to see your performance here.',
+
+  'settings': 'Settings',
+  'appearance': 'Appearance',
+  'theme': 'Theme',
+  'lightMode': 'Light',
+  'darkMode': 'Dark',
+  'systemDefault': 'System',
+  'language': 'Language',
+  'english': 'English',
+  'arabic': 'العربية',
+  'data': 'Data',
+  'resetAppData': 'Reset App Data',
+  'resetAppDataDesc': 'Delete your progress and restore default words',
+  'resetAppDataMessage':
+      'This will delete your added words, favorites, learned progress, and quiz results. Default words will be restored.',
+  'reset': 'Reset',
+  'dataResetSuccess': 'App data has been reset successfully.',
+
+  'buildVocabulary': 'Build Your Vocabulary',
+  'buildVocabularyDesc':
+      'Learn new words and build your vocabulary step by step.',
+  'practiceWithQuizzes': 'Practice With Quizzes',
+  'practiceWithQuizzesDesc':
+      'Test yourself with quizzes and improve your language skills.',
+  'trackYourProgress': 'Track Your Progress',
+  'trackYourProgressDesc':
+      'Keep track of your learning progress and see your improvement.',
+  'getStarted': 'Get Started',
+  'next': 'Next',
+  'skip': 'Skip',
+
+  'wordMarkedLearned': 'Word marked as learned! 🎉',
+  'wordMarkedNotLearned': 'Word marked as not learned.',
+
+  'readyToContinue': 'Ready to continue learning?',
+
+  'listen': 'Listen',
+  'pronunciationUnavailable':
+      'Pronunciation is not available for this language.',
+
+  'pronunciationPractice': 'Pronunciation Practice',
+  'practicePronunciation': 'Practice Pronunciation',
+  'pronunciationTip': 'Listen carefully, then tap the mic and say the word.',
+  'tapToRecord': 'Tap to record',
+  'tapToStop': 'Tap to stop',
+  'listening': 'Listening...',
+  'analyzingPronunciation': 'Analyzing pronunciation...',
+  'excellentPronunciation': 'Excellent pronunciation! 🎉',
+  'greatPronunciation': 'Great pronunciation!',
+  'goodPronunciation': 'Good pronunciation!',
+  'needsPracticePronunciation': 'Keep practicing – you are getting closer!',
+  'weHeard': 'We heard:',
+  'nothingRecognized': 'We could not hear you clearly. Please try again.',
+  'focusSounds': 'Sounds to focus on:',
+  'nextWord': 'Next Word',
+  'score': 'Score',
+  'speechNotAvailable':
+      'Speech recognition is not available for this language on your device.',
+  'microphonePermissionDenied':
+      'Microphone access is required to practice pronunciation. Please allow it in Settings and try again.',
+  'noSpeechDetected':
+      'We could not detect any speech. If you are using the Android emulator, make sure its microphone is enabled, then try again.',
+  'speechNetworkError':
+      'Speech recognition needs an internet connection. Check your network and try again.',
+  'speechRecognitionFailed': 'Speech recognition failed. Please try again.',
+  'speechInitializationTimedOut':
+      'Speech recognition is taking too long to start. Please retry.',
+  'recordingTooShort':
+      'The attempt was too short to capture any speech. Hold the button longer and try again.',
+  'recordingFailed':
+      'We could not record your attempt. Check the microphone and try again.',
+
+  'doesntSoundRight': "Doesn't sound right",
+  'soundsGood': 'Sounds good!',
+  'matchLabel': 'Match',
+  'yourAttempt': 'Your Attempt',
+  'reference': 'Reference',
+  'segmentsCaption': 'what we captured',
+  'attemptAudioUnavailable':
+      'Your attempt audio is unavailable on this device.',
+  'accuracyScore': 'Accuracy',
+  'fluencyScore': 'Fluency',
+  'completenessScore': 'Completeness',
+  'prosodyScore': 'Prosody',
+  'soundAccuracyLegend': 'Green = great · Amber = close · Red = needs work',
+  'omissionTag': 'skipped',
+  'insertionTag': 'extra',
+  'mispronunciationTag': 'different',
+  'feedbackFocusPhonemes':
+      'Focus on the highlighted sounds and compare them with the reference.',
+  'feedbackOmission': 'You skipped part of the word. Say every sound.',
+  'feedbackInsertion': 'You added an extra sound. Say only the word.',
+  'feedbackWrongWord':
+      'The engine could not match the word. Hear the reference and try again.',
+  'feedbackPhraseIncomplete':
+      'Only part of the phrase was captured. Say the whole phrase this time.',
+  'feedbackStart':
+      'The beginning wasn\'t captured clearly. Hear the reference and focus on the first part.',
+  'feedbackMiddle':
+      'The middle wasn\'t captured clearly. Hear the reference and try again.',
+  'feedbackEnd':
+      'The ending wasn\'t captured clearly. Hear the reference and focus on the last part.',
+  'feedbackMismatch':
+      'Some sounds were captured slightly differently. Hear the reference and try again.',
+  'feedbackExtra':
+      'A few extra sounds were captured. Try saying only the word.',
+  'feedbackClose':
+      'Almost! Hear the reference and try again with closer enunciation.',
+  'micUnavailable': 'No microphone was found on this device.',
+  'audioTooQuiet':
+      'The recording was too quiet or had no clear speech. Move closer to the microphone and try again.',
+  'unclearAudio':
+      'The audio was too noisy to score. Try again in a quiet place.',
+  'invalidAudioFormat': 'The recording could not be processed. Try again.',
+  'recordingClipped':
+      'The recording was distorted (too loud). Move the phone a little further away and try again.',
+  'preparingRecording': 'Preparing microphone...',
+  'recording': 'Recording...',
+  'howToProduceSound': 'How to produce this sound',
+  'articulationTip':
+      'Listen to the reference and imitate how the sound is shaped (tongue, lips and jaw).',
+  'focusOnRetry': 'Now try again, focusing on the highlighted sounds.',
+
+  'assessmentNetworkError':
+      'Pronunciation assessment needs an internet connection. Check your network and try again.',
+  'assessmentUnavailable':
+      'Pronunciation assessment is temporarily unavailable. Please try again.',
+  'tokenFailed': 'Could not get a valid assessment access token. Try again.',
+  'assessmentTimedOut':
+      'The assessment took too long. Check your connection and try again.',
+  'assessmentFailed': 'The assessment service failed. Try again.',
+  'malformedResponse': 'The assessment response was invalid. Try again.',
+
+  'dictionary': 'Dictionary',
+  'searchAnyWord': 'Search any English word',
+  'searchingWord': 'Searching…',
+  'dictionaryHint':
+      'Find any English word and LingoLearn will show its meaning, pronunciation, example and audio.',
+  'meaning': 'Meaning',
+  'wordNotFoundMessage': 'Word not found. Check the spelling and try again.',
+  'couldNotConnect': "Couldn't connect. Check your internet connection.",
+  'dictionaryApiError': 'Unable to load word information. Try again.',
+  'requestTimedOut':
+      'Couldn\'t load this word right now. Check your connection and try again.',
+  'dictionaryInvalidResponse':
+      'The dictionary server returned an unexpected response.',
+  'saveWordFailed': 'Could not save the word. Try again.',
+  'recentSearches': 'Recent searches',
+  'viewDetails': 'View details',
+  'addToMyWords': 'Add to My Words',
+  'removeFromMyWords': 'Remove from My Words',
+  'wordAddedToMyWords': 'Word added to My Words.',
+  'sourceLabel': 'Source',
+  'fetchWord': 'Search Word',
+  'fetchWordHint':
+      'Type any English word and LingoLearn will fill in its meaning, pronunciation, example and audio automatically.',
+  'autoFetched': 'auto-fetched',
+
+  'networkError': 'Network error. Check your internet connection.',
+  'unknownError': 'An unexpected error occurred. Please try again.',
+  'retry': 'Retry',
+
+  'login': 'Log In',
+  'signUp': 'Sign Up',
+  'logout': 'Log Out',
+  'email': 'Email',
+  'password': 'Password',
+  'confirmPassword': 'Confirm Password',
+  'name': 'Name',
+  'welcomeBack': 'Welcome back!',
+  'signInToContinue': 'Sign in to continue learning.',
+  'createAccount': 'Create Account',
+  'joinLingoLearn': 'Join LingoLearn and start building your vocabulary.',
+  'dontHaveAccount': "Don't have an account?",
+  'alreadyHaveAccount': 'Already have an account?',
+  'emailRequired': 'Email is required',
+  'invalidEmail': 'Please enter a valid email address.',
+  'passwordRequired': 'Password is required',
+  'passwordTooShort': 'Password must be at least 6 characters',
+  'nameRequired': 'Name is required',
+  'passwordsDoNotMatch': 'Passwords do not match',
+  'loginFailed': 'Unable to sign in. Please try again.',
+  'signUpFailed': 'Unable to create account. Please try again.',
+  'emailAlreadyExists':
+      'An account with this email already exists. Try signing in instead.',
+  'invalidCredentials': 'Invalid email or password. Please try again.',
+  'logoutConfirm': 'Log out?',
+  'logoutMessage': 'You will need to sign in again to access your account.',
+  'account': 'Account',
+  'wrongPassword': 'Incorrect password. Please try again.',
+  'userNotFound': 'No account found with this email. Please sign up first.',
+  'weakPassword': 'Password is too weak. Please use a stronger password.',
+  'operationNotAllowed':
+      'This sign-in method is not enabled. Please try again.',
+  'tooManyRequests': 'Too many attempts. Please try again later.',
+  'requiresRecentLogin': 'Please sign in again to complete this action.',
+  'userDisabled': 'This account has been disabled. Please contact support.',
+};

@@ -1,30 +1,41 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:lingolearn/core/localization/locale_controller.dart';
+import 'package:lingolearn/core/theme/theme_controller.dart';
+import 'package:lingolearn/features/auth/presentation/auth_controller.dart';
+import 'package:lingolearn/features/onboarding/data/onboarding_store.dart';
+import 'package:lingolearn/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:lingolearn/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const LanguageLearningApp(initialDarkMode: false, onboardingCompleted: false,));
+  testWidgets('App boots into onboarding on first launch', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final themeController = ThemeController(ThemeMode.system);
+    final localeController = LocaleController(const Locale('en'));
+    final onboardingStore = await OnboardingStore.load();
+    final authController = AuthController()
+      ..loadingOverride = false
+      ..authenticatedOverride = false;
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpWidget(
+      LingoLearnApp(
+        themeController: themeController,
+        localeController: localeController,
+        onboardingStore: onboardingStore,
+        authController: authController,
+      ),
+    );
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('LingoLearn'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 3));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OnboardingScreen), findsOneWidget);
   });
 }

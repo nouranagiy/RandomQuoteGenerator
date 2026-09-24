@@ -1,0 +1,16 @@
+{
+  "name": "lingolearn-azure-token-endpoint",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Secure Azure Speech token endpoint for LingoLearn pronunciation assessment",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

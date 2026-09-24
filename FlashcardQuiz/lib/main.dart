@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-import 'screens/home_screen.dart';
+import 'core/localization/app_localizations.dart';
+import 'core/theme/app_theme.dart';
+import 'core/utils/preferences_util.dart';
+import 'features/splash/presentation/splash_screen.dart';
+import 'features/splash/presentation/onboarding_screen.dart';
+import 'features/auth/presentation/screens/auth_container.dart';
+import 'features/home/presentation/home_screen.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const FlashcardApp());
 }
 
@@ -15,38 +25,62 @@ class FlashcardApp extends StatefulWidget {
 }
 
 class _FlashcardAppState extends State<FlashcardApp> {
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.system;
+  Locale _locale = const Locale('en');
+  String _homeRoute = 'splash';
 
   @override
   void initState() {
     super.initState();
-    _loadTheme();
+    _loadPreferences();
   }
 
-  Future<void> _loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    final isDark = prefs.getBool('isDarkMode') ?? false;
+  Future<void> _loadPreferences() async {
+    final themeModeStr = await PreferencesUtil.getThemeMode();
+    final langCode = await PreferencesUtil.getLanguage();
 
     if (!mounted) return;
 
     setState(() {
-      _themeMode =
-      isDark ? ThemeMode.dark : ThemeMode.light;
+      _themeMode = _themeModeFromString(themeModeStr);
+      _locale = Locale(langCode);
     });
   }
 
-  Future<void> _toggleTheme() async {
-    final prefs = await SharedPreferences.getInstance();
+  ThemeMode _themeModeFromString(String value) {
+    switch (value) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  }
 
-    final isDark = _themeMode != ThemeMode.dark;
+  String _themeModeToString(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'light';
+      case ThemeMode.dark:
+        return 'dark';
+      case ThemeMode.system:
+        return 'system';
+    }
+  }
 
-    await prefs.setBool('isDarkMode', isDark);
+  Future<void> _setThemeMode(ThemeMode mode) async {
+    await PreferencesUtil.setThemeMode(_themeModeToString(mode));
+    setState(() => _themeMode = mode);
+  }
 
-    setState(() {
-      _themeMode =
-      isDark ? ThemeMode.dark : ThemeMode.light;
-    });
+  Future<void> _setLanguage(String code) async {
+    await PreferencesUtil.setLanguage(code);
+    setState(() => _locale = Locale(code));
+  }
+
+  void _onRouteDetermined(String route) {
+    setState(() => _homeRoute = route);
   }
 
   @override
@@ -54,39 +88,39 @@ class _FlashcardAppState extends State<FlashcardApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Flashcard Quiz',
-
       themeMode: _themeMode,
-
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.light,
-        colorSchemeSeed: Colors.indigo,
-        scaffoldBackgroundColor: const Color(0xFFF7F8FC),
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-          backgroundColor: Color(0xFFF7F8FC),
-          surfaceTintColor: Colors.transparent,
-        ),
-      ),
-
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorSchemeSeed: Colors.indigo,
-        scaffoldBackgroundColor: const Color(0xFF181A1F),
-        appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 0,
-          backgroundColor: Color(0xFF181A1F),
-          surfaceTintColor: Colors.transparent,
-        ),
-      ),
-
-      home: HomeScreen(
-        onToggleTheme: _toggleTheme,
-        isDarkMode: _themeMode == ThemeMode.dark,
-      ),
+      theme: AppTheme.lightTheme(),
+      darkTheme: AppTheme.darkTheme(),
+      locale: _locale,
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      home: _buildCurrentScreen(),
     );
+  }
+
+  Widget _buildCurrentScreen() {
+    switch (_homeRoute) {
+      case 'splash':
+        return SplashScreen(onRouteDetermined: _onRouteDetermined);
+      case 'onboarding':
+        return OnboardingScreen(onComplete: () => _onRouteDetermined('auth'));
+      case 'auth':
+        return AuthContainer(onAuthenticated: () => _onRouteDetermined('home'));
+      case 'home':
+        return HomeScreen(
+          onSetThemeMode: _setThemeMode,
+          onLogout: () => _onRouteDetermined('auth'),
+          currentThemeMode: _themeMode,
+          languageCode: _locale.languageCode,
+          onLanguageChanged: _setLanguage,
+        );
+      default:
+        return SplashScreen(onRouteDetermined: _onRouteDetermined);
+    }
   }
 }

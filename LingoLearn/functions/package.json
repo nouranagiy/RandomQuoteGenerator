@@ -1,0 +1,16 @@
+{
+  "name": "lingolearn-functions",
+  "description": "Firebase Cloud Functions for LingoLearn pronunciation assessment token endpoint",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-functions": "^5.1.1"
+  },
+  "private": true
+}

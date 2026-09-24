@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "17880592323",
+    "project_id": "flashcardquiz-15923",
+    "storage_bucket": "flashcardquiz-15923.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:17880592323:android:6f93fccbfd2ec3c4109776",
+        "android_client_info": {
+          "package_name": "com.example.task1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBGyVnmkj0PwbVlQL66h-1VoqyfOqeWu4c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

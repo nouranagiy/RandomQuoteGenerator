@@ -1,0 +1,25 @@
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "quoteflow-1f7f7",
+          "appId": "1:431016300630:android:8e82266ed0cb0d996f6bf7",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "quoteflow-1f7f7",
+          "configurations": {
+            "android": "1:431016300630:android:8e82266ed0cb0d996f6bf7",
+            "ios": "1:431016300630:ios:58ea6bdc643433356f6bf7"
+          }
+        }
+      }
+    }
+  }
+}

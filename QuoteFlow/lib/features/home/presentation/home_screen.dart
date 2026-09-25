@@ -2,15 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:quoteflow/core/localization/app_localizations.dart';
+import 'package:quoteflow/core/theme/app_theme.dart';
+import 'package:quoteflow/features/favorites/presentation/favorites_provider.dart';
 import 'package:quoteflow/features/home/data/quotes_repository.dart';
 import 'package:quoteflow/models/quote.dart';
-import 'package:quoteflow/features/favorites/presentation/favorites_screen.dart';
-import 'package:quoteflow/features/favorites/presentation/favorites_provider.dart';
-import 'package:quoteflow/features/settings/presentation/settings_screen.dart';
 import 'package:quoteflow/shared/providers/auth_provider.dart';
 import 'package:quoteflow/shared/widgets/app_logo.dart';
+import 'package:quoteflow/shared/widgets/app_page.dart';
+import 'package:quoteflow/shared/widgets/app_page_header.dart';
+import 'package:quoteflow/shared/widgets/app_status_banner.dart';
+import 'package:quoteflow/shared/widgets/app_surface.dart';
+import 'package:quoteflow/shared/widgets/custom_button.dart';
+import 'package:quoteflow/shared/widgets/quote/featured_quote_card.dart';
 import 'package:quoteflow/shared/widgets/welcome_header.dart';
-import 'package:quoteflow/shared/widgets/quote_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,134 +25,149 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late Quote _currentQuote;
+  Locale _locale = const Locale('en');
+  bool _isFavoriteBusy = false;
+  bool _isCopyBusy = false;
 
   @override
   void initState() {
     super.initState();
-    _currentQuote = QuotesRepository.instance.firstQuote;
+    _currentQuote = QuotesRepository.instance.getRandomQuote(_locale);
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final locale = Localizations.localeOf(context);
+    if (locale != _locale) {
+      _locale = locale;
+      _getNewQuote();
+    }
   }
 
   Future<void> _toggleFavorite() async {
+    if (_isFavoriteBusy) return;
     final l10n = context.l10n;
     final auth = context.read<AuthProvider>();
     if (!auth.isAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.signInToSaveFavorites)),
-      );
+      _showMessage(l10n.signInToSaveFavorites);
       return;
     }
+
+    setState(() => _isFavoriteBusy = true);
     final favorites = context.read<FavoritesProvider>();
-    final result = await favorites.toggle(_currentQuote);
-    if (!mounted || result != null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(favorites.errorMessage ?? l10n.failedToSaveFavorite),
-      ),
-    );
+    try {
+      final result = await favorites.toggle(_currentQuote);
+      if (!mounted) return;
+      if (result == null) {
+        _showMessage(l10n.signInToSaveFavorites);
+      } else if (!result) {
+        _showMessage(_failureMessage(favorites.failure));
+      }
+    } finally {
+      if (mounted) setState(() => _isFavoriteBusy = false);
+    }
   }
 
   Future<void> _copyQuote() async {
-    final quoteText = '"${_currentQuote.text}" — ${_currentQuote.author}';
-    await Clipboard.setData(ClipboardData(text: quoteText));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.quoteCopied),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    if (_isCopyBusy) return;
+    final l10n = context.l10n;
+    final quote = _currentQuote;
+    setState(() => _isCopyBusy = true);
+    try {
+      await Clipboard.setData(
+        ClipboardData(
+          text: '"${quote.text}"\n${l10n.quoteAttribution(quote.author)}',
+        ),
+      );
+      if (mounted) _showMessage(l10n.quoteCopied);
+    } catch (_) {
+      if (mounted) _showMessage(l10n.unexpectedError);
+    } finally {
+      if (mounted) setState(() => _isCopyBusy = false);
+    }
   }
 
   void _getNewQuote() {
     setState(() {
-      _currentQuote = QuotesRepository.instance.getRandomQuote(exclude: _currentQuote);
+      _currentQuote = QuotesRepository.instance.getRandomQuote(
+        _locale,
+        exclude: _currentQuote,
+      );
     });
   }
 
-  void _openFavorites() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const FavoritesScreen()),
-    );
+  String _failureMessage(FavoritesFailure? failure) {
+    final l10n = context.l10n;
+    return switch (failure) {
+      FavoritesFailure.load => l10n.favoritesLoadError,
+      FavoritesFailure.add ||
+      FavoritesFailure.remove => l10n.failedToSaveFavorite,
+      null => l10n.unexpectedError,
+    };
   }
 
-  void _openSettings() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-    );
+  void _showMessage(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final auth = context.watch<AuthProvider>();
     final favorites = context.watch<FavoritesProvider>();
-    final isFavorite = favorites.isFavorite(_currentQuote.text);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16),
-          child: const AppLogo(size: 32),
-        ),
-        leadingWidth: 48,
-        title: const Text('QuoteFlow'),
-        actions: [
-          IconButton(
-            onPressed: _openFavorites,
-            tooltip: l10n.favorites,
-            icon: const Icon(Icons.favorite_border_rounded, size: 22),
+    return AppPage(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppSurface(
+            level: AppSurfaceLevel.raised,
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Row(
+              children: [
+                const ExcludeSemantics(child: AppLogo(size: AppSizes.logoMd)),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: AppPageHeader(
+                    title: l10n.appTitle,
+                    subtitle: l10n.inspireYourDay,
+                    semanticLabel: l10n.appTitle,
+                  ),
+                ),
+              ],
+            ),
           ),
-          IconButton(
-            onPressed: _openSettings,
-            tooltip: l10n.settings,
-            icon: const Icon(Icons.settings_outlined, size: 22),
+          const SizedBox(height: AppSpacing.xs),
+          const WelcomeHeader(),
+          const SizedBox(height: AppSpacing.lg),
+          if (!auth.isAuthenticated) ...[
+            AppStatusBanner(
+              type: AppStatusBannerType.infoPrimary,
+              message: l10n.signInToSaveFavorites,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          FeaturedQuoteCard(
+            quote: _currentQuote,
+            isFavorite: favorites.isFavorite(_currentQuote.text),
+            onFavoriteToggle: _toggleFavorite,
+            onCopy: _copyQuote,
+            isFavoriteBusy: _isFavoriteBusy,
+            isCopyBusy: _isCopyBusy,
+            statusLabel: l10n.dailyInspiration,
+            semanticLabel: l10n.dailyInspiration,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(height: AppSpacing.lg),
+          CustomButton(
+            label: l10n.newQuote,
+            icon: Icons.auto_awesome_rounded,
+            onPressed: _getNewQuote,
+            width: double.infinity,
+          ),
         ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 36, 24, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Welcome text — comfortable spacing below the logo/AppBar.
-              const WelcomeHeader(),
-              // Balances the card into the upper-middle region rather than
-              // cramming it against the top or dropping it to the exact center.
-              const Spacer(flex: 2),
-              // The Quote Card is the main element: medium width, centered
-              // horizontally, content-adaptive height (not stretched).
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: QuoteCard(
-                    quote: _currentQuote,
-                    isFavorite: isFavorite,
-                    onFavoriteToggle: _toggleFavorite,
-                    onCopy: _copyQuote,
-                  ),
-                ),
-              ),
-              // Comfortable flow between the card and the primary action.
-              const SizedBox(height: 28),
-              Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 640),
-                  child: ElevatedButton.icon(
-                    onPressed: _getNewQuote,
-                    icon: const Icon(Icons.refresh_rounded, size: 20),
-                    label: Text(l10n.newQuote),
-                  ),
-                ),
-              ),
-              // Gentle lower spacing keeping the composition breathing.
-              const Spacer(flex: 5),
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
       ),
     );
   }

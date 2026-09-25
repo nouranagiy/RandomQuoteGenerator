@@ -1,32 +1,38 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:quoteflow/core/utils/auth_error_handler.dart';
 import 'package:quoteflow/features/auth/data/auth_repository.dart';
-import 'package:quoteflow/features/auth/domain/user_profile_model.dart';
 import 'package:quoteflow/features/auth/data/user_profile_repository.dart';
+import 'package:quoteflow/features/auth/domain/user_profile_model.dart';
 
 class AuthProvider extends ChangeNotifier {
-  // Lazily resolved in [initialize] (after Firebase is ready). Constructing
-  // AuthRepository/UserProfileRepository eagerly would touch
-  // FirebaseAuth.instance/FirebaseFirestore.instance synchronously and crash
-  // with [core/no-app] if Firebase hasn't initialized yet.
+  final Completer<void> _firstAuthStateCompleter = Completer<void>();
+
   late final AuthRepository _authRepo;
   late final UserProfileRepository _profileRepo;
+  StreamSubscription<User?>? _authSubscription;
 
   User? _firebaseUser;
   UserProfile? _userProfile;
+  AuthErrorCode? _failure;
   bool _isLoading = true;
   bool _isBusy = false;
-  String? _errorMessage;
-  StreamSubscription<User?>? _authSubscription;
   bool _initialized = false;
+  bool _hasReceivedAuthState = false;
+  bool _disposed = false;
+  int _authStateRevision = 0;
 
   User? get firebaseUser => _firebaseUser;
   UserProfile? get userProfile => _userProfile;
   bool get isLoading => loadingOverride ?? _isLoading;
   bool get isBusy => _isBusy;
   bool get isAuthenticated => _resolvedAuthenticated;
-  String? get errorMessage => _errorMessage;
+  AuthErrorCode? get failure => _failure;
+  String? get errorMessage => _failure?.firebaseCode;
+  Future<void> get firstAuthState => _firstAuthStateCompleter.future;
+
   String get displayName => _userProfile?.name.isEmpty == false
       ? _userProfile!.name
       : (_firebaseUser?.displayName ?? '');
@@ -34,14 +40,6 @@ class AuthProvider extends ChangeNotifier {
       ? _userProfile!.email
       : (_firebaseUser?.email ?? '');
 
-  /// Constructs a provider without touching Firebase. [initialize] must be
-  /// called once Firebase is ready so the app can render its first frame
-  /// immediately while auth/Firestore initialize in the background.
-  AuthProvider();
-
-  /// Test-only seam: overrides the real Firebase-driven auth state. Used by
-  /// widget tests to simulate a signed-in/signed-out user without Firebase.
-  /// A null value falls back to the Firebase-backed [_firebaseUser].
   @visibleForTesting
   bool? authenticatedOverride;
   @visibleForTesting
@@ -50,47 +48,70 @@ class AuthProvider extends ChangeNotifier {
   bool get _resolvedAuthenticated =>
       authenticatedOverride ?? (_firebaseUser != null);
 
-  /// Idempotently subscribes to Firebase Auth. Safe to call only after
-  /// `Firebase.initializeApp()`. Never blocks startup.
-  void initialize() {
-    if (_initialized) return;
-    _initialized = true;
-    _authRepo = AuthRepository.instance;
-    _profileRepo = UserProfileRepository.instance;
-    _authSubscription = _authRepo.authStateChanges.listen(_onAuthStateChanged);
+  Future<void> initialize() {
+    if (!_initialized && !_disposed) {
+      _initialized = true;
+      _authRepo = AuthRepository.instance;
+      _profileRepo = UserProfileRepository.instance;
+      _authSubscription = _authRepo.authStateChanges.listen(
+        _onAuthStateChanged,
+        onError: _onAuthStateError,
+      );
+    }
+    return firstAuthState;
   }
 
   Future<void> _onAuthStateChanged(User? user) async {
+    final revision = ++_authStateRevision;
     _firebaseUser = user;
-    if (user != null) {
-      await _loadUserProfile(user.uid);
-    } else {
-      _userProfile = null;
+    _userProfile = null;
+    _isLoading = user != null;
+    _profileRepo.clearCache();
+    if (!_isBusy) _failure = null;
+
+    if (!_hasReceivedAuthState) {
+      _hasReceivedAuthState = true;
+      _completeFirstAuthState();
     }
+    _notify();
+
+    if (user == null) return;
+
+    final profile = await _loadUserProfile(user);
+    if (!_isCurrentAuthState(user.uid, revision)) return;
+
+    _userProfile = profile;
     _isLoading = false;
-    notifyListeners();
+    _notify();
   }
 
-  Future<void> _loadUserProfile(String uid) async {
+  void _onAuthStateError(Object error, StackTrace _) {
+    _failure = _failureFrom(error);
+    _isLoading = false;
+    _completeFirstAuthState();
+    _notify();
+  }
+
+  Future<UserProfile> _loadUserProfile(User user) async {
+    UserProfile? profile;
     try {
-      _userProfile ??= await _profileRepo.getProfile(uid);
-      _userProfile ??= UserProfile(
-        uid: uid,
-        name: _firebaseUser?.displayName ?? '',
-        email: _firebaseUser?.email ?? '',
-        createdAt: DateTime.now(),
-      );
-    } catch (e) {
-      // Fall back to the authentication-provided display name if Firestore
-      // is unavailable, so the UI never blocks on a failed read.
-      _userProfile ??= UserProfile(
-        uid: uid,
-        name: _firebaseUser?.displayName ?? '',
-        email: _firebaseUser?.email ?? '',
-        createdAt: DateTime.now(),
-      );
+      profile = await _profileRepo.getProfile(user.uid);
+    } catch (_) {
+      profile = null;
     }
-    notifyListeners();
+    return profile ??
+        UserProfile(
+          uid: user.uid,
+          name: user.displayName ?? '',
+          email: user.email ?? '',
+          createdAt: DateTime.now(),
+        );
+  }
+
+  bool _isCurrentAuthState(String uid, int revision) {
+    return !_disposed &&
+        revision == _authStateRevision &&
+        _firebaseUser?.uid == uid;
   }
 
   Future<bool> signUp({
@@ -98,67 +119,101 @@ class AuthProvider extends ChangeNotifier {
     required String email,
     required String password,
   }) async {
-    _errorMessage = null;
-    _isBusy = true;
-    notifyListeners();
+    if (!_beginOperation()) return false;
     try {
       await _authRepo.signUp(name: name, email: email, password: password);
       return true;
-    } on AuthException catch (e) {
-      _errorMessage = e.message;
-      return false;
-    } catch (e) {
-      _errorMessage = 'An unexpected error occurred. Please try again.';
+    } catch (error) {
+      _failure = _failureFrom(error);
       return false;
     } finally {
-      _isBusy = false;
-      notifyListeners();
+      _endOperation();
     }
   }
 
-  Future<bool> signIn({
-    required String email,
-    required String password,
-  }) async {
-    _errorMessage = null;
-    _isBusy = true;
-    notifyListeners();
+  Future<bool> signIn({required String email, required String password}) async {
+    if (!_beginOperation()) return false;
     try {
       await _authRepo.signIn(email: email, password: password);
       return true;
-    } on AuthException catch (e) {
-      _errorMessage = e.message;
-      return false;
-    } catch (e) {
-      _errorMessage = 'An unexpected error occurred. Please try again.';
+    } catch (error) {
+      _failure = _failureFrom(error);
       return false;
     } finally {
-      _isBusy = false;
-      notifyListeners();
+      _endOperation();
     }
   }
 
   Future<void> signOut() async {
-    _errorMessage = null;
-    await _authRepo.signOut();
-    _userProfile = null;
-    _firebaseUser = null;
-    // Drop the cached profile so a different account can't read stale data.
-    _profileRepo.clearCache();
-    notifyListeners();
+    if (!_beginOperation()) return;
+    final uid = _firebaseUser?.uid;
+    try {
+      await _authRepo.signOut();
+      _authStateRevision++;
+      _firebaseUser = null;
+      _userProfile = null;
+      _isLoading = false;
+      _profileRepo.clearCache(uid);
+      _notify();
+    } catch (error) {
+      _failure = _failureFrom(error);
+    } finally {
+      _endOperation();
+    }
+  }
+
+  bool _beginOperation() {
+    if (_disposed) return false;
+    if (!_initialized) {
+      _failure = AuthErrorCode.notInitialized;
+      _notify();
+      return false;
+    }
+    if (_isBusy) return false;
+
+    _failure = null;
+    _isBusy = true;
+    _notify();
+    return true;
+  }
+
+  void _endOperation() {
+    if (_disposed) return;
+    _isBusy = false;
+    _notify();
+  }
+
+  AuthErrorCode _failureFrom(Object error) {
+    if (error is AuthException) return error.code;
+    if (error is FirebaseAuthException) {
+      return AuthErrorHandler.fromException(error);
+    }
+    return AuthErrorCode.unknown;
   }
 
   void clearError() {
-    if (_errorMessage == null) return;
-    _errorMessage = null;
-    notifyListeners();
+    if (_failure == null) return;
+    _failure = null;
+    _notify();
+  }
+
+  void _completeFirstAuthState() {
+    if (!_firstAuthStateCompleter.isCompleted) {
+      _firstAuthStateCompleter.complete();
+    }
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
   }
 
   @override
   void dispose() {
-    _authSubscription?.cancel();
+    _disposed = true;
+    _completeFirstAuthState();
+    final subscription = _authSubscription;
     _authSubscription = null;
-    _initialized = false;
+    if (subscription != null) subscription.cancel().ignore();
     super.dispose();
   }
 }

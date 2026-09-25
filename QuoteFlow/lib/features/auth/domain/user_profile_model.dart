@@ -13,13 +13,22 @@ class UserProfile {
     required this.createdAt,
   });
 
-  factory UserProfile.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory UserProfile.fromFirestore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final storedUid = data?['uid'];
+    final storedName = data?['name'];
+    final storedEmail = data?['email'];
     return UserProfile(
-      uid: data['uid'] ?? '',
-      name: data['name'] ?? '',
-      email: data['email'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      uid: doc.id.isNotEmpty
+          ? doc.id
+          : storedUid is String
+          ? storedUid
+          : '',
+      name: storedName is String ? storedName : '',
+      email: storedEmail is String ? storedEmail : '',
+      createdAt: _parseCreatedAt(data?['createdAt']),
     );
   }
 
@@ -31,18 +40,17 @@ class UserProfile {
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
+}
 
-  UserProfile copyWith({
-    String? uid,
-    String? name,
-    String? email,
-    DateTime? createdAt,
-  }) {
-    return UserProfile(
-      uid: uid ?? this.uid,
-      name: name ?? this.name,
-      email: email ?? this.email,
-      createdAt: createdAt ?? this.createdAt,
-    );
+DateTime _parseCreatedAt(Object? value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
   }
+  if (value is String) {
+    return DateTime.tryParse(value) ??
+        DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+  }
+  return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 }

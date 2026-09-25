@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Thin wrapper that caches the [SharedPreferences] singleton so screens
@@ -14,5 +15,10 @@ class Prefs {
   /// Preloads the preferences before runApp so the first screen build is fast.
   static Future<void> preload() async {
     _instance ??= await SharedPreferences.getInstance();
+  }
+
+  @visibleForTesting
+  static void resetForTesting() {
+    _instance = null;
   }
 }

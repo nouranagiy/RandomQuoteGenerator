@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:quoteflow/core/theme/app_theme.dart';
 
 class CustomButton extends StatelessWidget {
   final String label;
@@ -20,39 +21,39 @@ class CustomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final child = isLoading
-        ? const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.white,
-            ),
-          )
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(icon, size: 18),
-                const SizedBox(width: 8),
+    final colorScheme = Theme.of(context).colorScheme;
+    final foreground = isOutlined ? colorScheme.primary : colorScheme.onPrimary;
+    final content = AnimatedSwitcher(
+      duration: AppMotion.fast,
+      switchInCurve: AppMotion.standardCurve,
+      switchOutCurve: AppMotion.standardCurve,
+      child: isLoading
+          ? SizedBox.square(
+              key: const ValueKey(true),
+              dimension: AppSizes.iconMd,
+              child: CircularProgressIndicator(color: foreground),
+            )
+          : Row(
+              key: const ValueKey(false),
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, size: AppSizes.iconMd),
+                  const SizedBox(width: AppSpacing.xs),
+                ],
+                Text(label),
               ],
-              Text(label),
-            ],
-          );
+            ),
+    );
 
     final button = isOutlined
         ? OutlinedButton(
             onPressed: isLoading ? null : onPressed,
-            child: child,
+            child: content,
           )
-        : ElevatedButton(
-            onPressed: isLoading ? null : onPressed,
-            child: child,
-          );
+        : FilledButton(onPressed: isLoading ? null : onPressed, child: content);
 
-    if (width != null) {
-      return SizedBox(width: width, child: button);
-    }
-    return button;
+    if (width == null) return button;
+    return SizedBox(width: width, child: button);
   }
 }

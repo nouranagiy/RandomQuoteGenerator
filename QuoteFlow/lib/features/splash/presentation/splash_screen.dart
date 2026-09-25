@@ -1,106 +1,140 @@
 import 'package:flutter/material.dart';
+import 'package:quoteflow/core/localization/app_localizations.dart';
+import 'package:quoteflow/core/theme/app_theme.dart';
 import 'package:quoteflow/shared/widgets/app_logo.dart';
+import 'package:quoteflow/shared/widgets/app_surface.dart';
 
-class SplashScreen extends StatefulWidget {
-  final VoidCallback onComplete;
-  const SplashScreen({
-    super.key,
-    required this.onComplete,
-  });
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 900),
-      vsync: this,
-    );
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.6)),
-    );
-    _scaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
-      ),
-    );
-    _controller.forward();
-    _scheduleHandoff();
-  }
-
-  void _scheduleHandoff() {
-    Future.delayed(const Duration(milliseconds: 1800), () {
-      if (mounted) {
-        widget.onComplete();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+class SplashScreen extends StatelessWidget {
+  const SplashScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primary.withValues(alpha: 0.08),
-              colorScheme.surface,
-              colorScheme.primary.withValues(alpha: 0.04),
-            ],
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: AppGradients.splashBackground(colorScheme),
+            ),
+            child: const SizedBox.expand(),
           ),
-        ),
-        child: Center(
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: ScaleTransition(
-              scale: _scaleAnimation,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const AppLogo(size: 80),
-                  const SizedBox(height: 24),
-                  Text(
-                    'QuoteFlow',
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Inspire your day',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+          PositionedDirectional(
+            top: AppSpacing.xxl,
+            end: AppSpacing.xxl,
+            child: IgnorePointer(
+              child: _SplashOrb(
+                size: AppSizes.logoHero,
+                color: colorScheme.primary.withValues(alpha: AppOpacity.subtle),
               ),
             ),
           ),
-        ),
+          PositionedDirectional(
+            bottom: AppSpacing.xxxl,
+            start: AppSpacing.xl,
+            child: IgnorePointer(
+              child: _SplashOrb(
+                size: AppSizes.logoLg,
+                color: colorScheme.secondary.withValues(
+                  alpha: AppOpacity.muted,
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppSizes.formMaxWidth,
+                  ),
+                  child: AppSurface(
+                    level: AppSurfaceLevel.elevated,
+                    padding: const EdgeInsets.all(AppSpacing.xxl),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const AppLogo(size: AppSizes.logoHero),
+                        const SizedBox(height: AppSpacing.xl),
+                        Text(
+                          l10n.appTitle,
+                          style: Theme.of(context).textTheme.headlineLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          l10n.inspireYourDay,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                        _SplashSignal(colorScheme: colorScheme),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class _SplashOrb extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _SplashOrb({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      child: SizedBox.square(dimension: size),
+    );
+  }
+}
+
+class _SplashSignal extends StatelessWidget {
+  final ColorScheme colorScheme;
+
+  const _SplashSignal({required this.colorScheme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _SignalBar(width: AppSizes.logoSm, color: colorScheme.primary),
+        const SizedBox(width: AppSpacing.xs),
+        _SignalBar(width: AppSizes.logoMd, color: colorScheme.secondary),
+        const SizedBox(width: AppSpacing.xs),
+        _SignalBar(width: AppSizes.logoLg, color: colorScheme.primaryContainer),
+      ],
+    );
+  }
+}
+
+class _SignalBar extends StatelessWidget {
+  final double width;
+  final Color color;
+
+  const _SignalBar({required this.width, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(AppRadii.pill),
+      ),
+      child: SizedBox(width: width, height: AppSpacing.xs),
     );
   }
 }

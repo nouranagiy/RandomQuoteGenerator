@@ -1,30 +1,68 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:quoteflow/core/constants/app_constants.dart';
 import 'package:quoteflow/core/utils/prefs.dart';
 
 enum ThemeModeOption { system, light, dark }
 
-class ThemeProvider extends ChangeNotifier {
-  ThemeModeOption _mode = ThemeModeOption.system;
-  ThemeModeOption get mode => _mode;
+enum ThemePersistenceFailure { loadFailed, saveFailed, invalidStoredValue }
 
+class ThemeProvider extends ChangeNotifier {
   ThemeProvider() {
-    _loadTheme();
+    unawaited(_loadTheme());
   }
 
+  ThemeModeOption _mode = ThemeModeOption.system;
+  ThemePersistenceFailure? _failure;
+  int _revision = 0;
+  bool _disposed = false;
+
+  ThemeModeOption get mode => _mode;
+  ThemePersistenceFailure? get failure => _failure;
+  bool get hasPersistenceFailure => _failure != null;
+
   Future<void> _loadTheme() async {
-    final prefs = await Prefs.instance;
-    final index = prefs.getInt(AppConstants.prefsKeyIsDarkMode) ?? 0;
-    _mode = ThemeModeOption.values[index.clamp(0, 2)];
-    notifyListeners();
+    final revision = _revision;
+    try {
+      final prefs = await Prefs.instance;
+      if (_disposed || revision != _revision) return;
+
+      final index = prefs.getInt(AppConstants.prefsKeyIsDarkMode);
+      if (index == null) {
+        _failure = null;
+      } else if (index >= 0 && index < ThemeModeOption.values.length) {
+        _mode = ThemeModeOption.values[index];
+        _failure = null;
+      } else {
+        _mode = ThemeModeOption.system;
+        _failure = ThemePersistenceFailure.invalidStoredValue;
+      }
+    } catch (_) {
+      if (_disposed || revision != _revision) return;
+      _failure = ThemePersistenceFailure.loadFailed;
+    }
+    _notify();
   }
 
   Future<void> setMode(ThemeModeOption mode) async {
-    if (_mode == mode) return;
+    if (_disposed || (_mode == mode && _failure == null)) return;
+    final revision = ++_revision;
     _mode = mode;
-    notifyListeners();
-    final prefs = await Prefs.instance;
-    await prefs.setInt(AppConstants.prefsKeyIsDarkMode, mode.index);
+    _failure = null;
+    _notify();
+
+    try {
+      final prefs = await Prefs.instance;
+      await prefs.setInt(AppConstants.prefsKeyIsDarkMode, mode.index);
+      if (!_disposed && revision != _revision) {
+        await prefs.setInt(AppConstants.prefsKeyIsDarkMode, _mode.index);
+      }
+    } catch (_) {
+      if (_disposed || revision != _revision) return;
+      _failure = ThemePersistenceFailure.saveFailed;
+      _notify();
+    }
   }
 
   ThemeMode get themeMode {
@@ -47,5 +85,15 @@ class ThemeProvider extends ChangeNotifier {
       case ThemeModeOption.system:
         return false;
     }
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

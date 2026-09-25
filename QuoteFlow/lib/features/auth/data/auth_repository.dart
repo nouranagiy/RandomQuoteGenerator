@@ -9,8 +9,6 @@ class AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final UserProfileRepository _profileRepo = UserProfileRepository.instance;
 
-  User? get currentUser => _auth.currentUser;
-
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   Future<UserCredential> signUp({
@@ -18,22 +16,33 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
+    late final UserCredential credential;
     try {
-      final credential = await _auth.createUserWithEmailAndPassword(
+      credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
-      if (credential.user != null) {
-        await _profileRepo.createProfile(
-          uid: credential.user!.uid,
-          name: name,
-          email: email,
-        );
-        await credential.user!.updateDisplayName(name);
-      }
+    } on FirebaseAuthException catch (error) {
+      throw AuthException(AuthErrorHandler.fromException(error), cause: error);
+    } catch (error) {
+      throw AuthException(AuthErrorCode.unknown, cause: error);
+    }
+
+    final user = credential.user;
+    if (user == null) {
+      throw const AuthException(AuthErrorCode.unknown);
+    }
+
+    try {
+      await user.updateDisplayName(name);
+      await _profileRepo.createProfile(uid: user.uid, name: name, email: email);
       return credential;
-    } on FirebaseAuthException catch (e) {
-      throw AuthException(AuthErrorHandler.getMessageFromException(e));
+    } catch (error) {
+      final cleanedUp = await _rollbackSignUp(user);
+      if (!cleanedUp) {
+        throw AuthException(AuthErrorCode.signUpCleanupFailed, cause: error);
+      }
+      throw AuthException(AuthErrorCode.signUpSetupFailed, cause: error);
     }
   }
 
@@ -46,20 +55,45 @@ class AuthRepository {
         email: email,
         password: password,
       );
-    } on FirebaseAuthException catch (e) {
-      throw AuthException(AuthErrorHandler.getMessageFromException(e));
+    } on FirebaseAuthException catch (error) {
+      throw AuthException(AuthErrorHandler.fromException(error), cause: error);
+    } catch (error) {
+      throw AuthException(AuthErrorCode.unknown, cause: error);
     }
   }
 
   Future<void> signOut() async {
-    await _auth.signOut();
+    try {
+      await _auth.signOut();
+    } on FirebaseAuthException catch (error) {
+      throw AuthException(AuthErrorHandler.fromException(error), cause: error);
+    } catch (error) {
+      throw AuthException(AuthErrorCode.signOutFailed, cause: error);
+    }
+  }
+
+  Future<bool> _rollbackSignUp(User user) async {
+    var succeeded = true;
+    try {
+      await _profileRepo.deleteProfile(user.uid);
+    } catch (_) {
+      succeeded = false;
+    }
+    try {
+      await user.delete();
+    } catch (_) {
+      succeeded = false;
+    }
+    return succeeded;
   }
 }
 
 class AuthException implements Exception {
-  final String message;
-  AuthException(this.message);
+  const AuthException(this.code, {this.cause});
+
+  final AuthErrorCode code;
+  final Object? cause;
 
   @override
-  String toString() => message;
+  String toString() => 'AuthException(${code.firebaseCode})';
 }

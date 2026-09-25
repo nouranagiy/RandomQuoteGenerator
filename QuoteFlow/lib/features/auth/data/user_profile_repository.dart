@@ -7,9 +7,6 @@ class UserProfileRepository {
   UserProfileRepository._();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // In-memory cache keyed by UID so repeat reads inside a session don't hit
-  // the network again.
   final Map<String, UserProfile> _cache = {};
 
   Future<void> createProfile({
@@ -27,26 +24,43 @@ class UserProfileRepository {
         .collection(AppConstants.firestoreUsersCollection)
         .doc(uid)
         .set(profile.toMap());
-    // Update the cache immediately so the UI reflects the freshly created
-    // profile without a redundant read.
     _cache[uid] = profile;
   }
 
-  Future<UserProfile?> getProfile(String uid, {bool forceRefresh = false}) async {
-    if (!forceRefresh && _cache[uid] != null) {
-      return _cache[uid];
-    }
-    final doc = await _firestore
+  Future<UserProfile?> getProfile(String uid) async {
+    final cached = _cache[uid];
+    if (cached != null) return cached;
+
+    final document = await _firestore
         .collection(AppConstants.firestoreUsersCollection)
         .doc(uid)
         .get(const GetOptions(source: Source.serverAndCache));
-    if (doc.exists) {
-      final profile = UserProfile.fromFirestore(doc);
-      _cache[uid] = profile;
-      return profile;
+    if (!document.exists) {
+      _cache.remove(uid);
+      return null;
     }
-    return null;
+
+    final profile = UserProfile.fromFirestore(document);
+    _cache[uid] = profile;
+    return profile;
   }
 
-  void clearCache() => _cache.clear();
+  Future<void> deleteProfile(String uid) async {
+    try {
+      await _firestore
+          .collection(AppConstants.firestoreUsersCollection)
+          .doc(uid)
+          .delete();
+    } finally {
+      _cache.remove(uid);
+    }
+  }
+
+  void clearCache([String? uid]) {
+    if (uid == null) {
+      _cache.clear();
+    } else {
+      _cache.remove(uid);
+    }
+  }
 }

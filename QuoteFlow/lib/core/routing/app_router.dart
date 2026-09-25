@@ -1,20 +1,27 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:quoteflow/core/utils/prefs.dart';
-import 'package:quoteflow/shared/providers/auth_provider.dart';
 import 'package:quoteflow/core/constants/app_constants.dart';
-import 'package:quoteflow/main.dart' show appNavigatorKey;
-import 'package:quoteflow/features/splash/presentation/splash_screen.dart';
-import 'package:quoteflow/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:quoteflow/core/routing/app_navigator_key.dart';
+import 'package:quoteflow/core/theme/app_theme.dart';
+import 'package:quoteflow/core/utils/prefs.dart';
 import 'package:quoteflow/features/auth/presentation/login_screen.dart';
 import 'package:quoteflow/features/auth/presentation/signup_screen.dart';
-import 'package:quoteflow/features/home/presentation/home_screen.dart';
+import 'package:quoteflow/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:quoteflow/features/shell/presentation/app_shell.dart';
+import 'package:quoteflow/features/splash/presentation/splash_screen.dart';
+import 'package:quoteflow/features/splash/presentation/startup_error_view.dart';
+import 'package:quoteflow/shared/providers/auth_provider.dart';
 
-enum AppRoute { splash, onboarding, login, signUp, home }
+typedef AppBootstrap = Future<void> Function();
+
+enum AppRoute { splash, startupError, onboarding, login, signUp, home }
 
 class AppRouter extends StatefulWidget {
-  const AppRouter({super.key});
+  final AppBootstrap bootstrap;
+
+  const AppRouter({super.key, required this.bootstrap});
 
   @override
   State<AppRouter> createState() => _AppRouterState();
@@ -22,130 +29,137 @@ class AppRouter extends StatefulWidget {
 
 class _AppRouterState extends State<AppRouter> {
   AppRoute _currentRoute = AppRoute.splash;
+  bool _startupComplete = false;
   bool _onboardingCompleted = false;
-  bool _splashDone = false;
   bool _wasAuthenticated = false;
+  Object? _startupError;
+  AuthProvider? _authProvider;
+  int _startupRun = 0;
+  int _authTransitionRevision = 0;
 
   @override
   void initState() {
     super.initState();
-    _startup();
+    unawaited(_runStartup());
   }
 
-  /// Loads onboarding state, then confirms the auth state is resolved before
-  /// the splash hands off to the next screen.
-  Future<void> _startup() async {
-    await _loadOnboardingState();
-    if (!mounted) return;
+  Future<void> _runStartup() async {
+    final run = ++_startupRun;
+    if (mounted && (_startupComplete || _startupError != null)) {
+      setState(() {
+        _startupComplete = false;
+        _startupError = null;
+        _currentRoute = AppRoute.splash;
+      });
+    }
 
-    // Wait until the auth state has been resolved by the provider (capped so
-    // we never block indefinitely).
-    final auth = context.read<AuthProvider>();
-    await _waitForAuth(auth);
-  }
+    try {
+      await Future.wait<void>([
+        widget.bootstrap(),
+        Future<void>.delayed(AppMotion.splash),
+      ]);
+      final prefs = await Prefs.instance;
+      if (!mounted || run != _startupRun) return;
 
-  Future<void> _waitForAuth(AuthProvider auth) async {
-    const timeout = Duration(seconds: 8);
-    final deadline = DateTime.now().add(timeout);
-    while (auth.isLoading && DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      _attachAuth(auth);
+      _wasAuthenticated = auth.isAuthenticated;
+      final onboardingCompleted =
+          prefs.getBool(AppConstants.prefsKeyOnboardingCompleted) ?? false;
+
+      setState(() {
+        _startupComplete = true;
+        _onboardingCompleted = onboardingCompleted;
+        _currentRoute = _targetFor(auth.isAuthenticated);
+      });
+    } catch (error) {
+      if (!_isCurrentStartupRun(run)) return;
+      setState(() {
+        _startupError = error;
+        _startupComplete = false;
+        _currentRoute = AppRoute.startupError;
+      });
     }
   }
 
-  Future<void> _loadOnboardingState() async {
-    final prefs = await Prefs.instance;
-    _onboardingCompleted = prefs.getBool(AppConstants.prefsKeyOnboardingCompleted) ?? false;
-    if (mounted) setState(() {});
+  bool _isCurrentStartupRun(int run) => mounted && run == _startupRun;
+
+  void _attachAuth(AuthProvider auth) {
+    if (_authProvider == auth) return;
+    _authProvider?.removeListener(_handleAuthChanged);
+    _authProvider = auth..addListener(_handleAuthChanged);
   }
 
-  void _routeTo(AppRoute route, {bool? onboarding}) {
-    if (!mounted) return;
-    setState(() {
-      if (onboarding != null) _onboardingCompleted = onboarding;
-      _currentRoute = route;
+  AppRoute _targetFor(bool isAuthenticated) {
+    if (isAuthenticated) return AppRoute.home;
+    return _onboardingCompleted ? AppRoute.login : AppRoute.onboarding;
+  }
+
+  void _handleAuthChanged() {
+    final auth = _authProvider;
+    if (!_startupComplete || auth == null) return;
+
+    final isAuthenticated = auth.isAuthenticated;
+    if (isAuthenticated == _wasAuthenticated) return;
+
+    _wasAuthenticated = isAuthenticated;
+    final revision = ++_authTransitionRevision;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || revision != _authTransitionRevision) return;
+      appNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+      setState(() {
+        _currentRoute = isAuthenticated ? AppRoute.home : _targetFor(false);
+      });
     });
   }
 
-  void _onSplashComplete() {
-    _splashDone = true;
-    final auth = context.read<AuthProvider>();
-    _wasAuthenticated = auth.isAuthenticated;
-    _goToTarget(auth);
-  }
-
-  /// Routes to the appropriate home/auth screen after opening.
-  void _goToTarget(AuthProvider auth) {
+  void _routeTo(AppRoute route) {
     if (!mounted) return;
-    if (auth.isAuthenticated) {
-      _routeTo(AppRoute.home);
-    } else if (_onboardingCompleted) {
-      _routeTo(AppRoute.login);
-    } else {
-      _routeTo(AppRoute.onboarding);
-    }
+    setState(() {
+      _currentRoute = route;
+      if (route == AppRoute.login) _onboardingCompleted = true;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-
-    // Only react to auth state *transitions*, never override the current
-    // screen while a form is being submitted.
-    if (_splashDone) {
-      final isAuthed = auth.isAuthenticated;
-
-      // Logged in -> go Home.
-      if (isAuthed && !_wasAuthenticated) {
-        _wasAuthenticated = true;
-        Future.microtask(() => _routeTo(AppRoute.home));
-      }
-      // Logged out (and we were in Home) -> go to Login.
-      else if (!isAuthed &&
-          _wasAuthenticated &&
-          (_currentRoute == AppRoute.home ||
-              _currentRoute == AppRoute.splash)) {
-        // Consume the transition synchronously so that any subsequent
-        // rebuild triggered by the auth provider won't re-enter this
-        // branch while the post-frame work is still pending.
-        _wasAuthenticated = false;
-
-        // Pop any pushed screens (e.g. Settings, Favorites) back to the
-        // root and switch to Login *after* the current frame completes.
-        // Calling popUntil() directly inside build() mutates the Navigator
-        // route stack, which triggers OverlayState.setState() during the
-        // build phase and causes the "setState() called during build" error.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          appNavigatorKey.currentState?.popUntil(
-            (route) => route.isFirst,
-          );
-          _routeTo(AppRoute.login);
-        });
-      }
-    }
-
-    return _buildRoute(_currentRoute);
+    return AnimatedSwitcher(
+      duration: AppMotion.standard,
+      switchInCurve: AppMotion.standardCurve,
+      switchOutCurve: AppMotion.exitCurve,
+      child: KeyedSubtree(
+        key: ValueKey(_currentRoute),
+        child: _buildRoute(_currentRoute),
+      ),
+    );
   }
 
   Widget _buildRoute(AppRoute route) {
-    switch (route) {
-      case AppRoute.splash:
-        return SplashScreen(onComplete: _onSplashComplete);
-      case AppRoute.onboarding:
-        return OnboardingScreen(
-          onComplete: () => _routeTo(AppRoute.login, onboarding: true),
-        );
-      case AppRoute.login:
-        return LoginScreen(
-          onNavigateToSignUp: () => _routeTo(AppRoute.signUp),
-        );
-      case AppRoute.signUp:
-        return SignUpScreen(
-          onNavigateToLogin: () => _routeTo(AppRoute.login),
-        );
-      case AppRoute.home:
-        return const HomeScreen();
-    }
+    return switch (route) {
+      AppRoute.splash => const SplashScreen(),
+      AppRoute.startupError => StartupErrorView(onRetry: _retryStartup),
+      AppRoute.onboarding => OnboardingScreen(
+        onComplete: () => _routeTo(AppRoute.login),
+      ),
+      AppRoute.login => LoginScreen(
+        onNavigateToSignUp: () => _routeTo(AppRoute.signUp),
+      ),
+      AppRoute.signUp => SignUpScreen(
+        onNavigateToLogin: () => _routeTo(AppRoute.login),
+      ),
+      AppRoute.home => const AppShell(),
+    };
+  }
+
+  void _retryStartup() {
+    unawaited(_runStartup());
+  }
+
+  @override
+  void dispose() {
+    _startupRun++;
+    _authProvider?.removeListener(_handleAuthChanged);
+    _authProvider = null;
+    super.dispose();
   }
 }

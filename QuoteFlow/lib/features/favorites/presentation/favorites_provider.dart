@@ -1,40 +1,40 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:quoteflow/features/favorites/data/favorites_repository.dart';
 import 'package:quoteflow/models/quote.dart';
 import 'package:quoteflow/shared/providers/auth_provider.dart';
 
-/// Holds the current user's favorites, backed by Firestore.
-///
-/// It binds to [AuthProvider] so favorites load automatically when the user
-/// logs in / the app starts, and clear when the user signs out. The favorite
-/// state is driven by Firestore (per authenticated UID), not by SharedPreferences.
+enum FavoritesFailure { load, add, remove }
+
 class FavoritesProvider extends ChangeNotifier {
-  // Resolved lazily on first Firestore use (after auth/Firebase is ready) to
-  // avoid touching FirebaseFirestore.instance during startup.
-  FavoritesRepository? _repo;
-  FavoritesRepository get _firestoreRepo => _repo ??= FavoritesRepository.instance;
+  FavoritesRepository? _repository;
+  FavoritesRepository get _firestoreRepository {
+    return _repository ??= FavoritesRepository.instance;
+  }
 
   AuthProvider? _auth;
-  bool _bound = false;
-
   final List<Quote> _quotes = [];
   final Set<String> _favoriteTexts = {};
+  Future<void> _operationTail = Future<void>.value();
   String? _uid;
+  FavoritesFailure? _failure;
   bool _isLoading = false;
-  String? _error;
+  bool _disposed = false;
+  int _stateRevision = 0;
 
   List<Quote> get quotes => List.unmodifiable(_quotes);
   bool get isLoading => _isLoading;
-  String? get errorMessage => _error;
+  FavoritesFailure? get failure => _failure;
+  String? get errorMessage => _failure?.name;
   String? get uid => _uid;
   bool get hasUser => _uid != null;
 
   bool isFavorite(String text) => _favoriteTexts.contains(text);
 
-  /// Binds to auth state changes so favorites follow the signed-in user.
   void bindTo(AuthProvider auth) {
-    if (_bound) return;
-    _bound = true;
+    if (_disposed || identical(_auth, auth)) return;
+    _auth?.removeListener(_handleAuthChanged);
     _auth = auth;
     auth.addListener(_handleAuthChanged);
     _handleAuthChanged();
@@ -42,105 +42,177 @@ class FavoritesProvider extends ChangeNotifier {
 
   void _handleAuthChanged() {
     final uid = _auth?.firebaseUser?.uid;
-    if (uid == _uid) return;
+    if (_disposed || uid == _uid) return;
+
+    _stateRevision++;
     _uid = uid;
-    if (uid == null) {
-      _quotes.clear();
-      _favoriteTexts.clear();
-      _error = null;
-      _isLoading = false;
-      notifyListeners();
-    } else {
-      loadFavorites(uid);
-    }
+    _quotes.clear();
+    _favoriteTexts.clear();
+    _failure = null;
+    _isLoading = uid != null;
+    _notify();
+
+    if (uid != null) unawaited(loadFavorites(uid));
   }
 
-  /// Loads the user's favorites from Firestore.
   Future<void> loadFavorites(String uid) async {
-    if (uid != _uid) return;
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-    try {
-      final favorites = await _firestoreRepo.getFavorites(uid);
-      if (uid != _uid) return;
-      _quotes
-        ..clear()
-        ..addAll(favorites);
-      _favoriteTexts
-        ..clear()
-        ..addAll(favorites.map((q) => q.text));
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      if (uid != _uid) return;
-      _isLoading = false;
-      _error = 'Could not load favorites.';
-      notifyListeners();
-    }
+    final revision = _stateRevision;
+    if (!_isCurrent(uid, revision)) return;
+
+    await _withOperationLock(() async {
+      if (!_isCurrent(uid, revision)) return;
+      _isLoading = true;
+      _failure = null;
+      _notify();
+
+      try {
+        final favorites = await _firestoreRepository.getFavorites(uid);
+        if (!_isCurrent(uid, revision)) return;
+        _quotes
+          ..clear()
+          ..addAll(favorites);
+        _favoriteTexts
+          ..clear()
+          ..addAll(favorites.map((quote) => quote.text));
+        _isLoading = false;
+        _notify();
+      } catch (_) {
+        if (!_isCurrent(uid, revision)) return;
+        _isLoading = false;
+        _failure = FavoritesFailure.load;
+        _notify();
+      }
+    });
   }
 
-  /// Toggles a quote's favorite state. Returns true if it was a favorite
-  /// after the toggle, or null on failure / when not authenticated.
-  Future<bool?> toggle(Quote quote) async {
-    if (_uid == null) return null;
-    final isFav = _favoriteTexts.contains(quote.text);
-    if (isFav) {
-      return (await remove(quote.text)) ? false : null;
-    }
-    return (await add(quote)) ? true : null;
-  }
-
-  Future<bool> add(Quote quote) async {
+  Future<bool?> toggle(Quote quote) {
     final uid = _uid;
-    if (uid == null) return false;
-    // Optimistic update.
-    final hadIt = _favoriteTexts.contains(quote.text);
-    if (!hadIt) {
+    final revision = _stateRevision;
+    if (uid == null) return Future<bool?>.value(null);
+
+    return _withOperationLock(() async {
+      if (!_isCurrent(uid, revision)) return null;
+      if (_favoriteTexts.contains(quote.text)) {
+        return _removeFavorite(uid, revision, quote.text);
+      }
+      return _addFavorite(uid, revision, quote);
+    });
+  }
+
+  Future<bool> add(Quote quote) {
+    final uid = _uid;
+    final revision = _stateRevision;
+    if (uid == null) return Future<bool>.value(false);
+
+    return _withOperationLock(() => _addFavorite(uid, revision, quote));
+  }
+
+  Future<bool> remove(String quoteText) {
+    final uid = _uid;
+    final revision = _stateRevision;
+    if (uid == null) return Future<bool>.value(false);
+
+    return _withOperationLock(() => _removeFavorite(uid, revision, quoteText));
+  }
+
+  Future<bool> _addFavorite(String uid, int revision, Quote quote) async {
+    if (!_isCurrent(uid, revision)) return false;
+
+    final hadFavorite = _favoriteTexts.contains(quote.text);
+    _failure = null;
+    if (!hadFavorite) {
       _favoriteTexts.add(quote.text);
       _quotes.insert(0, quote);
-      notifyListeners();
     }
+    _notify();
+
     try {
-      await _firestoreRepo.addFavorite(uid, quote);
+      await _firestoreRepository.addFavorite(uid, quote);
       return true;
     } catch (_) {
-      if (!hadIt) {
-        _favoriteTexts.remove(quote.text);
-        _quotes.removeWhere((q) => q.text == quote.text);
-        notifyListeners();
+      if (_isCurrent(uid, revision)) {
+        if (!hadFavorite) {
+          _favoriteTexts.remove(quote.text);
+          _quotes.removeWhere((favorite) => favorite.text == quote.text);
+        }
+        _failure = FavoritesFailure.add;
+        _notify();
       }
-      _error = 'Could not save favorite.';
-      notifyListeners();
       return false;
     }
   }
 
-  Future<bool> remove(String quoteText) async {
-    final uid = _uid;
-    if (uid == null) return false;
-    final hadIt = _favoriteTexts.contains(quoteText);
-    if (hadIt) {
-      _favoriteTexts.remove(quoteText);
-      _quotes.removeWhere((q) => q.text == quoteText);
-      notifyListeners();
-    }
+  Future<bool> _removeFavorite(
+    String uid,
+    int revision,
+    String quoteText,
+  ) async {
+    if (!_isCurrent(uid, revision)) return false;
+
+    final removedIndex = _quotes.indexWhere(
+      (favorite) => favorite.text == quoteText,
+    );
+    final removedQuote = removedIndex == -1 ? null : _quotes[removedIndex];
+    final hadFavorite =
+        removedQuote != null || _favoriteTexts.contains(quoteText);
+    _failure = null;
+    _favoriteTexts.remove(quoteText);
+    _quotes.removeWhere((favorite) => favorite.text == quoteText);
+    _notify();
+
     try {
-      await _firestoreRepo.removeFavorite(uid, quoteText);
+      await _firestoreRepository.removeFavorite(uid, quoteText);
       return true;
     } catch (_) {
-      if (!hadIt) {
-        _favoriteTexts.add(quoteText);
-        notifyListeners();
+      if (_isCurrent(uid, revision)) {
+        if (hadFavorite) {
+          _favoriteTexts.add(quoteText);
+          final alreadyRestored = _quotes.any(
+            (favorite) => favorite.text == quoteText,
+          );
+          if (removedQuote != null && !alreadyRestored) {
+            final insertionIndex = removedIndex < _quotes.length
+                ? removedIndex
+                : _quotes.length;
+            _quotes.insert(insertionIndex, removedQuote);
+          }
+        }
+        _failure = FavoritesFailure.remove;
+        _notify();
       }
-      _error = 'Could not remove favorite.';
-      notifyListeners();
       return false;
     }
+  }
+
+  Future<T> _withOperationLock<T>(Future<T> Function() operation) async {
+    final previousOperation = _operationTail;
+    final release = Completer<void>();
+    _operationTail = release.future;
+    await previousOperation;
+    try {
+      return await operation();
+    } finally {
+      release.complete();
+    }
+  }
+
+  bool _isCurrent(String uid, int revision) {
+    return !_disposed && _uid == uid && _stateRevision == revision;
+  }
+
+  void clearError() {
+    if (_failure == null) return;
+    _failure = null;
+    _notify();
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _auth?.removeListener(_handleAuthChanged);
     _auth = null;
     super.dispose();

@@ -4,10 +4,7 @@ import 'package:quoteflow/models/quote.dart';
 void main() {
   group('Quote Model', () {
     test('should create a Quote with text and author', () {
-      const quote = Quote(
-        text: 'Test quote',
-        author: 'Test Author',
-      );
+      const quote = Quote(text: 'Test quote', author: 'Test Author');
       expect(quote.text, 'Test quote');
       expect(quote.author, 'Test Author');
     });

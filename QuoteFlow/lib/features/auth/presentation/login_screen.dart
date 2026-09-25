@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:quoteflow/shared/providers/auth_provider.dart';
 import 'package:quoteflow/core/localization/app_localizations.dart';
-import 'package:quoteflow/shared/widgets/app_logo.dart';
+import 'package:quoteflow/core/theme/app_theme.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/app_auth_form.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/auth_error_banner.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/auth_footer_link.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/auth_form_validators.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/auth_text_fields.dart';
+import 'package:quoteflow/shared/providers/auth_provider.dart';
 import 'package:quoteflow/shared/widgets/custom_button.dart';
-import 'package:quoteflow/shared/widgets/custom_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
   final VoidCallback onNavigateToSignUp;
-  const LoginScreen({
-    super.key,
-    required this.onNavigateToSignUp,
-  });
+
+  const LoginScreen({super.key, required this.onNavigateToSignUp});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -21,7 +23,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -30,10 +31,23 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _clearAuthError() {
+    context.read<AuthProvider>().clearError();
+  }
 
+  void _navigateToSignUp() {
+    context.read<AuthProvider>().clearError();
+    widget.onNavigateToSignUp();
+  }
+
+  Future<void> _handleLogin() async {
+    final formState = _formKey.currentState;
+    FocusManager.instance.primaryFocus?.unfocus();
     final authProvider = context.read<AuthProvider>();
+    authProvider.clearError();
+
+    if (formState?.validate() != true) return;
+
     await authProvider.signIn(
       email: _emailController.text.trim(),
       password: _passwordController.text,
@@ -43,130 +57,67 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final colorScheme = Theme.of(context).colorScheme;
     final authProvider = context.watch<AuthProvider>();
+    final failure = authProvider.failure;
+    final isBusy = authProvider.isBusy;
+    final isExpanded =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded;
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const AppLogo(size: 64),
-                  const SizedBox(height: 28),
-                  Text(
-                    l10n.login,
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.loginSubtitle,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-                  CustomTextField(
-                    controller: _emailController,
-                    labelText: l10n.email,
-                    hintText: l10n.emailHint,
-                    prefixIcon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return l10n.emailRequired;
-                      }
-                      if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
-                          .hasMatch(value.trim())) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    controller: _passwordController,
-                    labelText: l10n.password,
-                    hintText: l10n.passwordHint,
-                    prefixIcon: Icons.lock_outline,
-                    obscureText: _obscurePassword,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return l10n.passwordRequired;
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  if (authProvider.errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.error.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: colorScheme.error.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.error_outline, size: 18, color: colorScheme.error),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                authProvider.errorMessage!,
-                                style: TextStyle(
-                                  color: colorScheme.error,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  CustomButton(
-                    label: l10n.login,
-                    isLoading: authProvider.isBusy,
-                    onPressed: _handleLogin,
-                    width: double.infinity,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        l10n.noAccount,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      TextButton(
-                        onPressed: widget.onNavigateToSignUp,
-                        child: Text(l10n.signUp),
-                      ),
-                    ],
-                  ),
-                ],
+      body: AppAuthForm(
+        title: l10n.login,
+        subtitle: l10n.loginSubtitle,
+        formKey: _formKey,
+        logoSize: isExpanded ? AppSizes.logoHero : AppSizes.logoLg,
+        padding: EdgeInsets.symmetric(
+          horizontal: isExpanded ? AppSpacing.xxl : AppSpacing.lg,
+          vertical: AppSpacing.xxxl,
+        ),
+        footer: AuthFooterLink(
+          prompt: l10n.noAccount,
+          actionLabel: l10n.signUp,
+          onPressed: isBusy ? null : _navigateToSignUp,
+        ),
+        child: AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AuthEmailField(
+                controller: _emailController,
+                labelText: l10n.email,
+                hintText: l10n.emailHint,
+                requiredMessage: l10n.emailRequired,
+                invalidMessage: l10n.invalidEmail,
+                onChanged: (_) => _clearAuthError(),
+                enabled: !isBusy,
               ),
-            ),
+              const SizedBox(height: AppSpacing.md),
+              AuthPasswordField(
+                controller: _passwordController,
+                labelText: l10n.password,
+                hintText: l10n.passwordHint,
+                showPasswordTooltip: l10n.showPassword,
+                hidePasswordTooltip: l10n.hidePassword,
+                validator: (value) => AuthFormValidators.password(
+                  value,
+                  requiredMessage: l10n.passwordRequired,
+                ),
+                onChanged: (_) => _clearAuthError(),
+                enabled: !isBusy,
+                onFieldSubmitted: (_) => _handleLogin(),
+              ),
+              if (failure != null) ...[
+                const SizedBox(height: AppSpacing.lg),
+                AuthErrorBanner(message: l10n.authError(failure)),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              CustomButton(
+                label: l10n.login,
+                isLoading: isBusy,
+                onPressed: _handleLogin,
+                width: double.infinity,
+              ),
+            ],
           ),
         ),
       ),

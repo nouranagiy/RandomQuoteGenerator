@@ -1,35 +1,40 @@
 import 'dart:math';
+import 'dart:ui';
+import 'package:quoteflow/core/localization/l10n.dart';
+import 'package:quoteflow/core/localization/app_localizations.dart';
 import 'package:quoteflow/models/quote.dart';
 
 class QuotesRepository {
   static final QuotesRepository instance = QuotesRepository._();
   QuotesRepository._();
 
-  final List<Quote> _quotes = const [
-    Quote(text: 'The only way to do great work is to love what you do.', author: 'Steve Jobs'),
-    Quote(text: 'Success is not final, failure is not fatal.', author: 'Winston Churchill'),
-    Quote(text: 'Believe you can and you are halfway there.', author: 'Theodore Roosevelt'),
-    Quote(text: 'It always seems impossible until it is done.', author: 'Nelson Mandela'),
-    Quote(text: 'The future depends on what you do today.', author: 'Mahatma Gandhi'),
-    Quote(text: 'Don\u2019t watch the clock; do what it does. Keep going.', author: 'Sam Levenson'),
-    Quote(text: 'Everything you can imagine is real.', author: 'Pablo Picasso'),
-    Quote(text: 'Start where you are. Use what you have. Do what you can.', author: 'Arthur Ashe'),
-    Quote(text: 'Dream big and dare to fail.', author: 'Norman Vaughan'),
-    Quote(text: 'Great things are done by a series of small things brought together.', author: 'Vincent van Gogh'),
+  static const List<String> _quoteIds = [
+    'q1',
+    'q2',
+    'q3',
+    'q4',
+    'q5',
+    'q6',
+    'q7',
+    'q8',
+    'q9',
+    'q10',
   ];
 
   final Random _random = Random();
 
-  Quote getRandomQuote({Quote? exclude}) {
-    if (_quotes.length <= 1) return _quotes.first;
+  Quote getRandomQuote(Locale locale, {Quote? exclude}) {
+    final L10n context = AppLocalizations.of(locale);
+    if (_quoteIds.length <= 1) return _quote(context, _random, 0);
     Quote quote;
     do {
-      quote = _quotes[_random.nextInt(_quotes.length)];
+      quote = _quote(context, _random, _random.nextInt(_quoteIds.length));
     } while (exclude != null && quote.text == exclude.text);
     return quote;
   }
 
-  Quote get firstQuote => _quotes.first;
-
-  List<Quote> get allQuotes => List.unmodifiable(_quotes);
+  Quote _quote(L10n context, Random random, int index) {
+    final id = _quoteIds[index];
+    return Quote(text: context.quoteBody(id), author: context.quoteAuthor(id));
+  }
 }

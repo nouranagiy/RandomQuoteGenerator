@@ -1,30 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:quoteflow/shared/providers/auth_provider.dart';
 import 'package:quoteflow/core/localization/app_localizations.dart';
-import 'package:quoteflow/shared/widgets/app_logo.dart';
+import 'package:quoteflow/core/theme/app_theme.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/app_auth_form.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/auth_error_banner.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/auth_footer_link.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/auth_form_validators.dart';
+import 'package:quoteflow/features/auth/presentation/widgets/auth_text_fields.dart';
+import 'package:quoteflow/shared/providers/auth_provider.dart';
 import 'package:quoteflow/shared/widgets/custom_button.dart';
-import 'package:quoteflow/shared/widgets/custom_text_field.dart';
 
 class SignUpScreen extends StatefulWidget {
   final VoidCallback onNavigateToLogin;
-  const SignUpScreen({
-    super.key,
-    required this.onNavigateToLogin,
-  });
+
+  const SignUpScreen({super.key, required this.onNavigateToLogin});
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
 }
 
 class _SignUpScreenState extends State<SignUpScreen> {
+  static const int _minimumPasswordLength = 6;
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
@@ -35,10 +37,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
-  Future<void> _handleSignUp() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _clearAuthError() {
+    context.read<AuthProvider>().clearError();
+  }
 
+  void _navigateToLogin() {
+    context.read<AuthProvider>().clearError();
+    widget.onNavigateToLogin();
+  }
+
+  Future<void> _handleSignUp() async {
+    final formState = _formKey.currentState;
+    FocusManager.instance.primaryFocus?.unfocus();
     final authProvider = context.read<AuthProvider>();
+    authProvider.clearError();
+
+    if (formState?.validate() != true) return;
+
     await authProvider.signUp(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
@@ -49,176 +64,105 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final colorScheme = Theme.of(context).colorScheme;
     final authProvider = context.watch<AuthProvider>();
+    final failure = authProvider.failure;
+    final isBusy = authProvider.isBusy;
+    final isExpanded =
+        MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded;
 
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const AppLogo(size: 64),
-                  const SizedBox(height: 28),
-                  Text(
-                    l10n.signUp,
-                    style: Theme.of(context).textTheme.headlineLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.signUpSubtitle,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-                  CustomTextField(
-                    controller: _nameController,
-                    labelText: l10n.name,
-                    hintText: l10n.nameHint,
-                    prefixIcon: Icons.person_outline,
-                    keyboardType: TextInputType.name,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return l10n.nameRequired;
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    controller: _emailController,
-                    labelText: l10n.email,
-                    hintText: l10n.emailHint,
-                    prefixIcon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return l10n.emailRequired;
-                      }
-                      if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
-                          .hasMatch(value.trim())) {
-                        return 'Please enter a valid email';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    controller: _passwordController,
-                    labelText: l10n.password,
-                    hintText: l10n.passwordHint,
-                    prefixIcon: Icons.lock_outline,
-                    obscureText: _obscurePassword,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() => _obscurePassword = !_obscurePassword);
-                      },
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return l10n.passwordRequired;
-                      }
-                      if (value.length < 6) {
-                        return l10n.passwordMinLength;
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    controller: _confirmPasswordController,
-                    labelText: l10n.confirmPassword,
-                    hintText: l10n.confirmPasswordHint,
-                    prefixIcon: Icons.lock_outline,
-                    obscureText: _obscureConfirmPassword,
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureConfirmPassword
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() =>
-                            _obscureConfirmPassword = !_obscureConfirmPassword);
-                      },
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return l10n.passwordRequired;
-                      }
-                      if (value != _passwordController.text) {
-                        return l10n.passwordsDoNotMatch;
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  if (authProvider.errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: colorScheme.error.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: colorScheme.error.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.error_outline, size: 18, color: colorScheme.error),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                authProvider.errorMessage!,
-                                style: TextStyle(
-                                  color: colorScheme.error,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  CustomButton(
-                    label: l10n.signUp,
-                    isLoading: authProvider.isBusy,
-                    onPressed: _handleSignUp,
-                    width: double.infinity,
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        l10n.hasAccount,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      TextButton(
-                        onPressed: widget.onNavigateToLogin,
-                        child: Text(l10n.login),
-                      ),
-                    ],
-                  ),
-                ],
+      body: AppAuthForm(
+        title: l10n.signUp,
+        subtitle: l10n.signUpSubtitle,
+        formKey: _formKey,
+        logoSize: isExpanded ? AppSizes.logoHero : AppSizes.logoLg,
+        padding: EdgeInsets.symmetric(
+          horizontal: isExpanded ? AppSpacing.xxl : AppSpacing.lg,
+          vertical: AppSpacing.xxxl,
+        ),
+        footer: AuthFooterLink(
+          prompt: l10n.hasAccount,
+          actionLabel: l10n.login,
+          onPressed: isBusy ? null : _navigateToLogin,
+        ),
+        child: AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AuthTextField(
+                controller: _nameController,
+                labelText: l10n.name,
+                hintText: l10n.nameHint,
+                prefixIcon: Icons.person_outline_rounded,
+                keyboardType: TextInputType.name,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.name],
+                validator: (value) => AuthFormValidators.requiredValue(
+                  value,
+                  message: l10n.nameRequired,
+                ),
+                onChanged: (_) => _clearAuthError(),
+                enabled: !isBusy,
               ),
-            ),
+              const SizedBox(height: AppSpacing.md),
+              AuthEmailField(
+                controller: _emailController,
+                labelText: l10n.email,
+                hintText: l10n.emailHint,
+                requiredMessage: l10n.emailRequired,
+                invalidMessage: l10n.invalidEmail,
+                onChanged: (_) => _clearAuthError(),
+                enabled: !isBusy,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              AuthPasswordField(
+                controller: _passwordController,
+                labelText: l10n.password,
+                hintText: l10n.passwordHint,
+                showPasswordTooltip: l10n.showPassword,
+                hidePasswordTooltip: l10n.hidePassword,
+                autofillHints: const [AutofillHints.newPassword],
+                textInputAction: TextInputAction.next,
+                validator: (value) => AuthFormValidators.password(
+                  value,
+                  requiredMessage: l10n.passwordRequired,
+                  minLengthMessage: l10n.passwordMinLength,
+                  minLength: _minimumPasswordLength,
+                ),
+                onChanged: (_) => _clearAuthError(),
+                enabled: !isBusy,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              AuthPasswordField(
+                controller: _confirmPasswordController,
+                labelText: l10n.confirmPassword,
+                hintText: l10n.confirmPasswordHint,
+                showPasswordTooltip: l10n.showPassword,
+                hidePasswordTooltip: l10n.hidePassword,
+                autofillHints: const [AutofillHints.newPassword],
+                validator: (value) => AuthFormValidators.passwordsMatch(
+                  value,
+                  password: _passwordController.text,
+                  requiredMessage: l10n.passwordRequired,
+                  mismatchMessage: l10n.passwordsDoNotMatch,
+                ),
+                onChanged: (_) => _clearAuthError(),
+                enabled: !isBusy,
+                onFieldSubmitted: (_) => _handleSignUp(),
+              ),
+              if (failure != null) ...[
+                const SizedBox(height: AppSpacing.lg),
+                AuthErrorBanner(message: l10n.authError(failure)),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              CustomButton(
+                label: l10n.signUp,
+                isLoading: isBusy,
+                onPressed: _handleSignUp,
+                width: double.infinity,
+              ),
+            ],
           ),
         ),
       ),

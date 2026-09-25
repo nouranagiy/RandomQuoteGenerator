@@ -1,30 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:quoteflow/core/localization/app_localizations.dart';
+import 'package:quoteflow/core/theme/app_theme.dart';
 
 class AppLogo extends StatelessWidget {
   final double size;
-  const AppLogo({super.key, this.size = 32});
+  final String? semanticLabel;
+
+  const AppLogo({super.key, this.size = AppSizes.logoMd, this.semanticLabel});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primary,
-            colorScheme.primary.withValues(alpha: 0.7),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    final label = semanticLabel ?? context.l10n.appTitle;
+    final iconSize = size <= AppSizes.logoSm
+        ? AppSizes.iconSm
+        : size <= AppSizes.logoMd
+        ? AppSizes.iconMd
+        : AppSizes.iconLg;
+
+    return Semantics(
+      image: true,
+      label: label,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          gradient: AppGradients.logo(colorScheme),
+          borderRadius: BorderRadius.circular(AppRadii.lg),
         ),
-        borderRadius: BorderRadius.circular(size * 0.28),
-      ),
-      child: Icon(
-        Icons.format_quote_rounded,
-        color: Colors.white,
-        size: size * 0.55,
+        child: Icon(
+          Icons.format_quote_rounded,
+          color: colorScheme.onPrimary,
+          size: iconSize,
+        ),
       ),
     );
   }

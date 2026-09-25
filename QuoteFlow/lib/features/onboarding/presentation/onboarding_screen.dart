@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:quoteflow/core/constants/app_constants.dart';
 import 'package:quoteflow/core/localization/app_localizations.dart';
+import 'package:quoteflow/core/localization/l10n.dart';
+import 'package:quoteflow/core/theme/app_theme.dart';
 import 'package:quoteflow/core/utils/prefs.dart';
+import 'package:quoteflow/features/onboarding/presentation/onboarding_controls.dart';
+import 'package:quoteflow/features/onboarding/presentation/onboarding_page_content.dart';
+import 'package:quoteflow/features/onboarding/presentation/onboarding_visual_panel.dart';
+import 'package:quoteflow/shared/widgets/app_status_banner.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onComplete;
+
   const OnboardingScreen({super.key, required this.onComplete});
 
   @override
@@ -14,44 +21,70 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _controller = PageController();
   int _currentPage = 0;
+  bool _isCompleting = false;
+  bool _showSaveError = false;
 
-  final List<_OnboardingPage> _pages = [];
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _buildPages();
-      setState(() {});
-    });
-  }
-
-  void _buildPages() {
-    final l10n = context.l10n;
-    _pages.clear();
-    _pages.addAll([
+  List<_OnboardingPage> _buildPages(L10n l10n) {
+    return [
       _OnboardingPage(
-        icon: Icons.explore_outlined,
+        icon: Icons.explore_rounded,
         title: l10n.onboardingTitle1,
         description: l10n.onboardingDesc1,
+        accent: OnboardingVisualAccent.primary,
       ),
       _OnboardingPage(
-        icon: Icons.favorite_outline,
+        icon: Icons.bookmark_rounded,
         title: l10n.onboardingTitle2,
         description: l10n.onboardingDesc2,
+        accent: OnboardingVisualAccent.secondary,
       ),
       _OnboardingPage(
-        icon: Icons.share_outlined,
+        icon: Icons.ios_share_rounded,
         title: l10n.onboardingTitle3,
         description: l10n.onboardingDesc3,
+        accent: OnboardingVisualAccent.tertiary,
       ),
-    ]);
+    ];
   }
 
   Future<void> _complete() async {
-    final prefs = await Prefs.instance;
-    await prefs.setBool(AppConstants.prefsKeyOnboardingCompleted, true);
+    if (_isCompleting) return;
+    setState(() {
+      _isCompleting = true;
+      _showSaveError = false;
+    });
+
+    var saved = false;
+    try {
+      final prefs = await Prefs.instance;
+      saved = await prefs.setBool(
+        AppConstants.prefsKeyOnboardingCompleted,
+        true,
+      );
+    } catch (_) {
+      saved = false;
+    }
+
+    if (!mounted) return;
+    if (!saved) {
+      setState(() {
+        _isCompleting = false;
+        _showSaveError = true;
+      });
+      return;
+    }
     widget.onComplete();
+  }
+
+  void _advance(int pageCount) {
+    if (_currentPage >= pageCount - 1) {
+      _complete();
+      return;
+    }
+    _controller.nextPage(
+      duration: AppMotion.relaxed,
+      curve: AppMotion.standardCurve,
+    );
   }
 
   @override
@@ -63,124 +96,74 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final colorScheme = Theme.of(context).colorScheme;
-    final isLast = _currentPage == _pages.length - 1;
+    final pages = _buildPages(l10n);
+    final maxWidth = MediaQuery.sizeOf(context).width >= AppBreakpoints.expanded
+        ? AppSizes.contentMaxWidth
+        : AppSizes.onboardingMaxWidth;
+    final isLast = _currentPage >= pages.length - 1;
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            Align(
-              alignment: Alignment.topRight,
-              child: TextButton(
-                onPressed: _complete,
-                child: Text(l10n.skip),
-              ),
-            ),
-            Expanded(
-              child: _pages.isEmpty
-                  ? const SizedBox()
-                  : PageView.builder(
-                      controller: _controller,
-                      itemCount: _pages.length,
-                      onPageChanged: (index) {
-                        setState(() => _currentPage = index);
-                      },
-                      itemBuilder: (context, index) {
-                        final page = _pages[index];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 40),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 100,
-                                height: 100,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                child: Icon(
-                                  page.icon,
-                                  size: 48,
-                                  color: colorScheme.primary,
-                                ),
-                              ),
-                              const SizedBox(height: 40),
-                              Text(
-                                page.title,
-                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                page.description,
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: SizedBox(
+              width: double.infinity,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xl,
+                  vertical: AppSpacing.lg,
+                ),
+                child: Column(
+                  children: [
+                    OnboardingHeader(
+                      tagline: l10n.inspireYourDay,
+                      skipLabel: l10n.skip,
+                      onSkip: _isCompleting ? null : _complete,
                     ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: List.generate(
-                      _pages.length,
-                      (index) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.only(right: 8),
-                        width: _currentPage == index ? 24 : 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: _currentPage == index
-                              ? colorScheme.primary
-                              : colorScheme.primary.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
+                    if (_showSaveError) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      AppStatusBanner(
+                        type: AppStatusBannerType.error,
+                        title: l10n.error,
+                        message: l10n.preferenceSaveError,
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.xs),
+                    Expanded(
+                      child: PageView.builder(
+                        controller: _controller,
+                        itemCount: pages.length,
+                        onPageChanged: (index) {
+                          setState(() => _currentPage = index);
+                        },
+                        itemBuilder: (context, index) {
+                          final page = pages[index];
+                          return OnboardingPageContent(
+                            title: page.title,
+                            description: page.description,
+                            icon: page.icon,
+                            accent: page.accent,
+                          );
+                        },
                       ),
                     ),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (isLast) {
-                        _complete();
-                      } else {
-                        _controller.nextPage(
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    const SizedBox(height: AppSpacing.md),
+                    OnboardingFooter(
+                      pageLabels: pages.map((page) => page.title).toList(),
+                      currentPage: _currentPage,
+                      actionLabel: isLast ? l10n.done : l10n.next,
+                      doneIcon: Icons.check_rounded,
+                      onPressed: _isCompleting
+                          ? null
+                          : () => _advance(pages.length),
+                      isLoading: _isCompleting,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(isLast ? l10n.done : l10n.next),
-                        const SizedBox(width: 8),
-                        Icon(
-                          isLast ? Icons.check_rounded : Icons.arrow_forward_rounded,
-                          size: 18,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -191,10 +174,12 @@ class _OnboardingPage {
   final IconData icon;
   final String title;
   final String description;
+  final OnboardingVisualAccent accent;
 
   const _OnboardingPage({
     required this.icon,
     required this.title,
     required this.description,
+    required this.accent,
   });
 }

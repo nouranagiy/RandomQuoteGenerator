@@ -1,104 +1,96 @@
-# Random Quote Generator
+# QuoteFlow
 
-A simple and clean Random Quote Generator application built with Flutter.
+A modern Flutter quote application with authentication, favorites, localization, and a resilient startup flow.
 
 ## 📱 Project Overview
 
-QuoteFlow is a Random Quote Generator that displays inspirational quotes and their authors. Users can generate a new quote, save their favorite quotes, copy quotes to the clipboard, and switch between Light and Dark Mode.
+QuoteFlow displays inspirational quotes, lets users sign in, save favorites, copy quotes, and switch between Light and Dark modes. The app is localized for English and Arabic, uses a responsive navigation shell, and recovers gracefully from startup failures.
 
 ## ✨ Features
 
-* Display a random quote when the app opens
-* Generate a new random quote
-* Display quote author clearly
-* Favorite quotes
-* View saved favorite quotes
-* Remove quotes from favorites
-* Copy quote and author to clipboard
-* Light Mode
-* Dark Mode
-* Save preferences locally
-* Clean and user-friendly interface
+- Splash startup with a minimum display duration and automatic retry on failure
+- Onboarding flow for first launch
+- Authentication with email/password sign-in and sign-up
+- Localized quote display in English and Arabic
+- New quote generation
+- Favorite management with failure handling and rollback
+- Copy quotes to the clipboard
+- Settings with theme and locale preferences
+- Responsive shell with navigation rail on larger screens and a bottom navigation bar on compact screens
+- Accessibility-aware layout and RTL support
 
 ## 🛠️ Technologies Used
 
-* Flutter
-* Dart
-* Material Design
-* SharedPreferences
-* Flutter Clipboard API
+- Flutter and Dart
+- Material Design 3
+- Firebase Authentication and Cloud Firestore
+- Provider for state management
+- SharedPreferences for local preferences
+- Flutter Localizations for English and Arabic support
 
 ## 📂 Project Structure
 
 ```text
 lib/
-├── data/
-│   └── quotes_data.dart
-│
+├── core/
+│   ├── bootstrap.dart
+│   ├── constants/
+│   ├── localization/
+│   ├── routing/
+│   ├── theme/
+│   └── utils/
+├── features/
+│   ├── auth/
+│   ├── favorites/
+│   ├── home/
+│   ├── onboarding/
+│   ├── settings/
+│   ├── shell/
+│   └── splash/
 ├── models/
-│   └── quote.dart
-│
-├── screens/
-│   ├── home_screen.dart
-│   └── favorites_screen.dart
-│
-└── main.dart
+├── shared/
+│   ├── providers/
+│   └── widgets/
+├── main.dart
+|── app.dart
+└── firebase_options.dart
+assets/
+└── fonts/
+test/
 ```
 
 ## 🚀 How to Run
 
 ### Prerequisites
 
-Make sure you have:
-
-* Flutter SDK
-* Dart SDK
-* Android Studio or Visual Studio Code
-* Android emulator or physical Android device
+- Flutter SDK
+- Dart SDK
+- Android Studio or Visual Studio Code
+- An Android emulator or physical device
 
 ### Installation
 
-Clone the repository:
-
-```bash
-git clone https://github.com/nouranagiy/RandomQuoteGenerator.git
-```
-
-Open the project:
-
-```bash
-cd RandomQuoteGenerator
-```
-
-Install dependencies:
-
 ```bash
 flutter pub get
-```
-
-Run the application:
-
-```bash
 flutter run
 ```
 
-## 📌 Task Requirements Covered
+## 📌 Requirements Covered
 
-* Random quote displayed when opening the application
-* New Quote button
-* Different quote on each request
-* Quote text and author displayed clearly
-* Clean and minimal user interface
+- Random quote displayed when opening the application
+- New Quote button
+- Different quote on each request
+- Quote text and author displayed clearly
+- Clean and user-friendly interface
 
-Additional features were implemented to improve the user experience, including favorites, clipboard copying, local storage, and Light/Dark Mode.
+Additional implemented features include authentication, favorites, clipboard copying, local preference storage, Light/Dark mode, localization, and startup error recovery.
 
 ## 👩‍💻 Developer
 
-**Nora Nagy**
+**Nora Nagiy**
 
 Information Systems Graduate | Flutter Developer
 
 ## 📄 License
 
-This project was developed for educational
-
+This project was developed for educational purposes.

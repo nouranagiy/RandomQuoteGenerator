@@ -1,30 +1,19 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:quoteflow/main.dart';
+import 'package:quoteflow/models/quote.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp(isDarkMode: false,));
+  group('Quote Model', () {
+    test('should create a Quote with text and author', () {
+      const quote = Quote(text: 'Test quote', author: 'Test Author');
+      expect(quote.text, 'Test quote');
+      expect(quote.author, 'Test Author');
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    test('should support const constructor', () {
+      const quote1 = Quote(text: 'A', author: 'B');
+      const quote2 = Quote(text: 'A', author: 'B');
+      expect(quote1.text, equals(quote2.text));
+      expect(quote1.author, equals(quote2.author));
+    });
   });
 }
